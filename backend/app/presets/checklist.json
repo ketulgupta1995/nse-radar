@@ -1,0 +1,41 @@
+{
+  "entry": [
+    {"id": "thesis", "label": "Why will this go up in the next 1–4 months?", "type": "text", "required": true,
+     "help": "One or two plain sentences. If you can't explain it simply, you may not understand it well enough yet."},
+    {"id": "wrong_if", "label": "What would prove me wrong?", "type": "text", "required": true,
+     "help": "A fact or price level that, if it happens, means the idea has failed. Decide it now, while calm."},
+    {"id": "catalyst", "label": "Is there a catalyst or event coming up?", "type": "text", "required": false,
+     "help": "For example results, a product launch or a policy change that could move the price."},
+    {"id": "source", "label": "Where did the idea come from?", "type": "text", "required": false,
+     "help": "A screen, a news item, a tip. Over time the journal shows which sources work for you."},
+    {"id": "entry_price", "label": "Entry price", "type": "number", "required": true,
+     "help": "The price per share you expect to pay."},
+    {"id": "stop", "label": "Stop-loss price", "type": "number", "required": true,
+     "help": "If the price falls to this level you sell and accept the loss. The app suggests one from the stock's usual daily movement."},
+    {"id": "target", "label": "Target price", "type": "number", "required": true,
+     "help": "The price at which you plan to take profit."},
+    {"id": "time_stop_weeks", "label": "Exit if nothing happens in N weeks", "type": "number", "required": true,
+     "help": "If the idea hasn't worked after this many weeks, exit and free the money."},
+    {"id": "risk_pct", "label": "Risk % of capital", "type": "number", "required": true,
+     "help": "If the stop-loss is hit, you lose this % of your capital on this one trade."},
+    {"id": "read_announcements", "label": "I have read the last 3 months of announcements", "type": "bool",
+     "required": true, "must_be_true": true,
+     "help": "Company announcements can reveal problems (pledged shares, auditor changes) that prices don't show yet."},
+    {"id": "checked_results", "label": "I have checked the latest quarterly results", "type": "bool",
+     "required": true, "must_be_true": true,
+     "help": "Check that sales and profit are growing, not shrinking."},
+    {"id": "emotion", "label": "How am I feeling?", "type": "choice", "required": true,
+     "choices": ["calm", "FOMO", "revenge", "bored"],
+     "help": "Be honest. The journal will show how your mood relates to your results."}
+  ],
+  "exit": [
+    {"id": "exit_price", "label": "Exit price", "type": "number", "required": true,
+     "help": "The price per share you sold at."},
+    {"id": "exit_reason", "label": "Why did I exit?", "type": "choice", "required": true,
+     "choices": ["stop", "target", "time stop", "thesis broken", "better opportunity", "other"]},
+    {"id": "thesis_right", "label": "Was my original thesis right?", "type": "choice", "required": true,
+     "choices": ["yes", "partly", "no"],
+     "help": "A trade can lose money even when the thesis was right, and win when it was wrong. Judge the thesis separately."},
+    {"id": "lesson", "label": "What did I learn?", "type": "text", "required": false}
+  ]
+}

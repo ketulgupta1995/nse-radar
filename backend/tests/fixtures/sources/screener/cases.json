@@ -1,0 +1,10 @@
+{
+  "transport": {
+    "https://www.screener.in/company/TCS/consolidated/": {"status": 200, "file": "TCS_consolidated.html"}
+  },
+  "cases": [
+    {"capability": "fundamentals", "args": {"symbol": "TCS"}, "expect": {"min_rows": 1}},
+    {"capability": "fundamentals", "args": {"symbol": "NOPE"}, "expect": {"raises": "NotFound"}}
+  ],
+  "refusal": {"capability": "fundamentals", "args": {"symbol": "TCS"}}
+}

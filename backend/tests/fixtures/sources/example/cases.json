@@ -1,0 +1,12 @@
+{
+  "transport": {
+    "https://example.test/universe.csv": {"status": 200, "file": "universe.csv"},
+    "https://example.test/bars/20261106": {"status": 200, "file": "bars_20261106.csv"}
+  },
+  "cases": [
+    {"capability": "universe", "args": {}, "expect": {"min_rows": 3, "symbols": ["AAA", "BBB"]}},
+    {"capability": "bars", "args": {"d": "2026-11-06"}, "expect": {"min_rows": 3, "symbols": ["AAA"]}},
+    {"capability": "bars", "args": {"d": "2026-11-07"}, "expect": {"raises": "NotFound"}}
+  ],
+  "refusal": {"capability": "bars", "args": {"d": "2026-11-06"}}
+}

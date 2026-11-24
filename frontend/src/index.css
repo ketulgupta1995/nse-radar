@@ -1,0 +1,223 @@
+/* Tailwind theme + utilities, plus a "legacy" layer (below utilities) for the few older shared rules still in use. Tailwind's reset is not loaded, so the base rules below set the defaults pages rely on. */
+@layer theme, base, legacy, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Design tokens. Light is the base; the dark block below overrides it. */
+:root {
+  --background: #f6f7f9;
+  --foreground: #1a1d24;
+  --card: #ffffff;
+  --card-foreground: #1a1d24;
+  --popover: #ffffff;
+  --popover-foreground: #1a1d24;
+  --muted: #eceef2;
+  --muted-foreground: #626b7c;
+  --border: #dfe2e8;
+  --input: #dfe2e8;
+  --accent: #4f5fe0;
+  --accent-foreground: #ffffff;
+  --ring: #4f5fe0;
+  --success: #12805c;
+  --danger: #c0392b;
+  --warning: #b7791f;
+  --info: #3b6fd4;
+  /* Gains and losses only: P&L and price direction. Never use for anything else. */
+  --pos: #12805c;
+  --neg: #c0392b;
+  --radius-card: 8px;
+  --radius-control: 6px;
+  color-scheme: light;
+}
+:root.dark {
+  --background: #0f1115;
+  --foreground: #e6e9ef;
+  --card: #171a21;
+  --card-foreground: #e6e9ef;
+  --popover: #1b1f27;
+  --popover-foreground: #e6e9ef;
+  --muted: #1e222b;
+  --muted-foreground: #98a1b3;
+  --border: #2a2f3a;
+  --input: #2a2f3a;
+  --accent: #5b6cf0;
+  --accent-foreground: #ffffff;
+  --ring: #5b6cf0;
+  --success: #3fbf93;
+  --danger: #ef6b5c;
+  --warning: #e0a63d;
+  --info: #6c93f0;
+  --pos: #3fbf93;
+  --neg: #ef6b5c;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-ring: var(--ring);
+  --color-success: var(--success);
+  --color-danger: var(--danger);
+  --color-warning: var(--warning);
+  --color-info: var(--info);
+  --color-pos: var(--pos);
+  --color-neg: var(--neg);
+  --radius-card: var(--radius-card);
+  --radius-control: var(--radius-control);
+  --font-sans: "Inter Variable", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono Variable", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* Old variable names stay defined so unmigrated pages still follow the theme. */
+:root, :root.dark {
+  --bg: var(--background);
+  --panel: var(--card);
+  --text: var(--foreground);
+}
+
+@layer legacy {
+/* Base styles. Tailwind's reset is not loaded, so these set the defaults pages rely on. */
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--background); color: var(--foreground); font: 14px/1.5 var(--font-sans); }
+h1 { font-size: 1.5rem; margin: 0 0 .5rem; }
+h2 { font-size: 1.15rem; margin: 1rem 0 .5rem; }
+h3 { font-size: 1rem; margin: .75rem 0 .5rem; }
+a { color: var(--accent); }
+.muted { color: var(--muted-foreground); }
+.pos { color: var(--pos); } .neg { color: var(--neg); }
+.stale { color: var(--warning); font-weight: 600; }
+.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+/* Older shared component styles still used by pages that were only restyled in part.
+   Move these into Tailwind classes as those components are next touched. */
+.neg { color: var(--neg); }
+.page-footer { margin-top: 2rem; padding-top: .5rem; border-top: 1px solid var(--border); color: var(--muted-foreground); }
+table { border-collapse: collapse; width: 100%; }
+th, td { text-align: left; padding: .4rem .6rem; border-bottom: 1px solid var(--border); }
+th { color: var(--muted-foreground); font-weight: 600; }
+.chip { display: inline-block; padding: 0 .5rem; border-radius: 999px; font-size: 12px; color: #fff; background: #6a7385; }
+.progress { position: relative; display: inline-block; width: 110px; height: 1.1em; vertical-align: middle;
+  background: var(--border); border-radius: 4px; overflow: hidden; }
+button.link { background: none; border: 0; padding: 0; color: var(--accent); cursor: pointer; font: inherit; text-align: left; }
+tr.clickable { cursor: pointer; }
+tr.clickable:hover { background: var(--panel); }
+.sched-editor { display: flex; flex-wrap: wrap; gap: .75rem; align-items: center; padding: .5rem; background: var(--panel); }
+.log { font: 12px/1.4 ui-monospace, monospace; max-height: 280px; overflow: auto; padding: .5rem;
+  background: var(--bg); border: 1px solid var(--border); white-space: pre-wrap; }
+.log-warn { color: #b7791f; }
+.log-error { color: var(--neg); }
+.scroll-box { max-height: 200px; overflow: auto; }
+.card { padding: .75rem 1rem; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; }
+.card-head { display: flex; justify-content: space-between; align-items: center; gap: .5rem; }
+.card h3 { margin: 0; font-size: 1.05rem; }
+.warn { color: #b7791f; }
+.priority-row { margin-bottom: 1rem; }
+.priority-row h3 { margin: .5rem 0 .25rem; text-transform: capitalize; }
+.priority-row ol { margin: 0 0 .5rem; padding-left: 1.25rem; }
+.health { display: flex; flex-wrap: wrap; gap: .25rem 1rem; padding: .5rem .75rem; margin: .5rem 0; background: var(--panel);
+  border: 1px solid var(--border); border-radius: 8px; font-size: 13px; }
+.tabs { display: flex; gap: .25rem; margin: .5rem 0 1rem; border-bottom: 1px solid var(--border); }
+.tab { background: none; border: 0; border-bottom: 2px solid transparent; padding: .4rem .8rem; color: var(--muted-foreground); cursor: pointer; font: inherit; }
+.tab.active { color: var(--text); border-bottom-color: var(--accent); }
+.job-group { margin-bottom: 1rem; }
+.job-group summary { cursor: pointer; }
+.symbol-search { position: relative; }
+.symbol-search input { width: 100%; padding: .35rem .5rem; border: 1px solid var(--border); border-radius: 6px;
+  background: var(--bg); color: var(--text); }
+.symbol-results { position: absolute; z-index: 10; left: 0; right: 0; margin: 2px 0 0; padding: 2px; list-style: none;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 6px; max-height: 60vh; overflow: auto; }
+.symbol-results li { padding: .3rem .5rem; border-radius: 4px; cursor: pointer; }
+.symbol-results li.active, .symbol-results li:hover { background: var(--bg); }
+.star { border: 1px solid var(--border); background: var(--panel); color: var(--text); border-radius: 6px; padding: .25rem .6rem; cursor: pointer; }
+.star[aria-pressed="true"] { color: var(--accent); border-color: var(--accent); }
+.tag { border: 1px solid var(--border); border-radius: 4px; padding: 0 .3rem; font-size: .8em; }
+.card { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: .75rem 1rem; margin: 0 0 1rem; max-width: 640px; }
+.card h2 { font-size: 1.05rem; margin: 0 0 .5rem; }
+.settings .field { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: .25rem 0; flex-wrap: wrap; }
+.settings input:not([type="range"]), .settings select { padding: .25rem .4rem; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text); }
+.settings input[type="number"] { width: 9rem; }
+.settings .slider { display: inline-flex; gap: .5rem; align-items: center; }
+.settings .feed-row { display: flex; gap: .4rem; margin-bottom: .4rem; }
+.settings .feed-row input:last-of-type { flex: 1; min-width: 0; }
+.chip { display: inline-flex; gap: .3rem; align-items: center; border: 1px solid var(--border); background: var(--panel); color: var(--text); border-radius: 999px; padding: .1rem .6rem; font: inherit; }
+.chip button { border: 0; background: none; color: var(--muted-foreground); cursor: pointer; padding: 0; font: inherit; }
+.chip.add { cursor: pointer; color: var(--accent); }
+.price-chart { max-width: 1100px; }
+.modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: flex-start; justify-content: center; padding: 3vh 1rem; z-index: 50; overflow: auto; }
+.modal { width: min(560px, 100%); max-width: 100%; margin: 0; }
+.modal-head { display: flex; justify-content: space-between; align-items: center; }
+.modal-head button { border: 0; background: none; color: var(--text); font-size: 1.4rem; cursor: pointer; }
+.modal-foot { display: flex; justify-content: flex-end; gap: .5rem; margin-top: 1rem; }
+.steps { display: flex; gap: .5rem; list-style: none; padding: 0; margin: 0 0 .75rem; color: var(--muted-foreground); flex-wrap: wrap; }
+.steps li.active { color: var(--accent); font-weight: 600; }
+.checklist-form { display: flex; flex-direction: column; gap: .6rem; }
+.field.stacked { display: flex; flex-direction: column; gap: .2rem; }
+.checklist-form input:not([type="checkbox"]), .checklist-form textarea, .checklist-form select, .modal input:not([type="checkbox"]) { padding: .3rem .4rem; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text); font: inherit; }
+.check { display: flex; gap: .5rem; align-items: flex-start; }
+.req { color: var(--neg); }
+.sizing { margin: .75rem 0 0; background: var(--bg); }
+.banner.warn { border: 1px solid var(--neg); color: var(--neg); border-radius: 6px; padding: .5rem .75rem; margin-top: .6rem; }
+.summary { display: grid; grid-template-columns: max-content 1fr; gap: .2rem .8rem; }
+.summary dt { color: var(--muted-foreground); }
+.summary dd { margin: 0; }
+.stat { margin: 0; min-width: 11rem; flex: 1; }
+.table-wrap { overflow-x: auto; }
+table.data { border-collapse: collapse; width: 100%; }
+table.data th, table.data td { text-align: left; padding: .4rem .6rem; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.amber { color: #b7791f; }
+.planbar { position: relative; height: 10px; width: 140px; border-radius: 5px; overflow: visible; background: var(--border); }
+.planbar-red, .planbar-green { position: absolute; top: 0; height: 100%; }
+.planbar-red { background: var(--neg); opacity: .55; border-radius: 5px 0 0 5px; }
+.planbar-green { background: var(--pos); opacity: .55; border-radius: 0 5px 5px 0; }
+.planbar-entry { position: absolute; top: -3px; width: 2px; height: 16px; background: var(--text); transform: translateX(-1px); }
+.planbar-last { position: absolute; top: -2px; width: 12px; height: 12px; border-radius: 50%; background: var(--accent); border: 2px solid var(--panel); transform: translateX(-6px); }
+.trade { max-width: 800px; margin-bottom: .5rem; padding: .25rem .75rem; }
+.insights { margin: 0 0 1rem; padding-left: 1.2rem; }
+.fund-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: .75rem 1rem; margin: .5rem 0; }
+.fund-item .tag { color: var(--muted-foreground); }
+.stock-panel { max-width: none; margin-top: 1rem; }
+.group-box { border: 1px solid var(--border); border-radius: 8px; padding: .5rem .75rem; margin: .5rem 0; background: var(--panel); }
+.group-head, .group-foot { display: flex; gap: .75rem; align-items: center; flex-wrap: wrap; margin: .25rem 0; }
+.group-body { margin-left: .5rem; }
+.condition-row { display: flex; gap: .5rem; align-items: flex-start; flex-wrap: wrap; margin: .4rem 0; }
+.operand { display: inline-flex; gap: .4rem; align-items: center; flex-wrap: wrap; }
+.operand input[type="number"] { width: 5.5rem; }
+.param { font-size: .85em; color: var(--muted-foreground); }
+.advanced summary { cursor: pointer; font-size: .85em; color: var(--muted-foreground); }
+.rule-describe { font-weight: 500; }
+.chip-row { display: flex; flex-wrap: wrap; gap: .4rem; margin: .5rem 0; }
+.filter-chip { border: 1px solid var(--border); border-radius: 999px; padding: .1rem .7rem; background: var(--panel); color: inherit; cursor: pointer; font: inherit; font-size: .85em; }
+.filter-chip[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+.ann-list, .news-list { list-style: none; padding: 0; margin: .5rem 0; }
+.ann-row, .news-list li { padding: .4rem 0; border-bottom: 1px solid var(--border); }
+.ann-row details { display: inline; }
+.ann-row summary { display: inline; cursor: pointer; }
+.metric-col.emphasis { border-color: var(--accent); border-width: 2px; }
+.metric-col dl { margin: 0; }
+.equity-chart { width: 100%; min-height: 340px; }
+.backtest-form label { display: block; margin: .5rem 0; }
+.exit-row { margin: .5rem 0; }
+.exit-row label { display: block; }
+.status-indicator { font-size: 12px; display: block; }
+.status-indicator.updating { color: var(--accent); }
+.shortlist { list-style: none; padding: 0; margin: 0; }
+.shortlist li { display: grid; grid-template-columns: 2rem 1fr; gap: .5rem; padding: .6rem 0; border-bottom: 1px solid var(--border); }
+.score-bar { display: inline-block; width: 90px; height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; vertical-align: middle; }
+.score-bar > span { display: block; height: 100%; background: var(--accent); }
+.chip { display: inline-block; margin: .15rem .3rem .15rem 0; padding: .1rem .5rem; border-radius: 999px; background: var(--bg); border: 1px solid var(--border); font-size: 12px; }
+.chip.screen { border-color: var(--accent); }
+.disclaimer { color: var(--muted-foreground); font-size: 12px; margin: .5rem 0 1rem; }
+
+}

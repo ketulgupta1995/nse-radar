@@ -1,0 +1,9 @@
+{
+  "transport": {
+    "https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms": {"status": 200, "file": "sample.xml"}
+  },
+  "cases": [
+    {"capability": "news", "args": {}, "expect": {"min_rows": 3}}
+  ],
+  "refusal": {"capability": "news", "args": {}}
+}

@@ -1,0 +1,123 @@
+{
+  "transport": {
+    "https://www.nseindia.com/api/corporates-corporateActions?index=equities&symbol=SAMPLE": {
+      "status": 200,
+      "file": "corp_actions_SAMPLE.json"
+    },
+    "https://www.nseindia.com/api/corporates-corporateActions?index=equities&symbol=NONE": {
+      "status": 200,
+      "body": "[]"
+    },
+    "https://www.nseindia.com/api/corporates-financial-results?index=equities&period=Quarterly&symbol=TCS": {
+      "status": 200,
+      "file": "financial_results_TCS.json"
+    },
+    "https://www.nseindia.com/api/integrated-filing-results?index=equities&symbol=TCS&type=Integrated+Filing-+Financials": {
+      "status": 200,
+      "file": "integrated_results_TCS.json"
+    },
+    "https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1734607_08102026100810_WEB.xml": {
+      "status": 200,
+      "file": "xbrl_integrated_sample.xml"
+    },
+    "https://nsearchives.nseindia.com/corporate/xbrl/INDAS_117182_1341298_09012025093940.xml": {
+      "status": 200,
+      "file": "xbrl_sample.xml"
+    },
+    "https://www.nseindia.com/api/event-calendar": {
+      "status": 200,
+      "file": "event_calendar.json"
+    },
+    "https://www.nseindia.com/api/corporate-announcements?index=equities&symbol=TCS": {
+      "status": 200,
+      "file": "announcements_TCS.json"
+    }
+  },
+  "cases": [
+    {
+      "capability": "actions",
+      "args": {
+        "symbol": "SAMPLE"
+      },
+      "expect": {
+        "min_rows": 3,
+        "symbols": [
+          "SAMPLE"
+        ]
+      }
+    },
+    {
+      "capability": "actions",
+      "args": {
+        "symbol": "MISSING"
+      },
+      "expect": {
+        "raises": "NotFound"
+      }
+    },
+    {
+      "capability": "quarters",
+      "args": {
+        "symbol": "TCS",
+        "known": []
+      },
+      "expect": {
+        "min_rows": 2,
+        "symbols": [
+          "TCS"
+        ]
+      }
+    },
+    {
+      "capability": "quarters",
+      "args": {
+        "symbol": "MISSING",
+        "known": []
+      },
+      "expect": {
+        "raises": "NotFound"
+      }
+    },
+    {
+      "capability": "announcements",
+      "args": {
+        "symbol": "TCS",
+        "since": "2026-10-01"
+      },
+      "expect": {
+        "min_rows": 5,
+        "symbols": [
+          "TCS"
+        ]
+      }
+    },
+    {
+      "capability": "announcements",
+      "args": {
+        "symbol": "MISSING",
+        "since": "2026-10-01"
+      },
+      "expect": {
+        "raises": "NotFound"
+      }
+    }
+    ,
+    {
+      "capability": "events",
+      "args": {},
+      "expect": {
+        "min_rows": 5,
+        "symbols": [
+          "ACE",
+          "OIL"
+        ]
+      }
+    }
+  ],
+  "refusal": {
+    "capability": "actions",
+    "args": {
+      "symbol": "SAMPLE"
+    }
+  }
+}

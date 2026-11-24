@@ -1,0 +1,49 @@
+{
+  "transport": {
+    "https://nsearchives.nseindia.com/content/indices/ind_nifty500list.csv": {
+      "status": 200,
+      "file": "nifty500list.csv"
+    },
+    "https://nsearchives.nseindia.com/content/equities/symbolchange.csv": {
+      "status": 200,
+      "file": "symbolchange.csv"
+    },
+    "https://nsearchives.nseindia.com/content/indices/ind_close_all_": {
+      "status": 200,
+      "file": "ind_close_all_06112026.csv"
+    }
+  },
+  "cases": [
+    {
+      "capability": "universe",
+      "args": {},
+      "expect": {
+        "min_rows": 400,
+        "symbols": [
+          "360ONE",
+          "ABB"
+        ]
+      }
+    },
+    {
+      "capability": "symbol_changes",
+      "args": {},
+      "expect": {
+        "min_rows": 10
+      }
+    },
+    {
+      "capability": "index",
+      "args": {
+        "start": "2020-01-01"
+      },
+      "expect": {
+        "min_rows": 1
+      }
+    }
+  ],
+  "refusal": {
+    "capability": "universe",
+    "args": {}
+  }
+}

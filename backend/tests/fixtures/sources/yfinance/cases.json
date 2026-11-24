@@ -1,0 +1,12 @@
+{
+  "transport": {},
+  "cases": [
+    {"capability": "bars", "args": {"symbol": "TCS", "start": "2026-11-01", "end": "2026-11-06"}, "expect": {"min_rows": 2, "symbols": ["TCS"]}},
+    {"capability": "bars", "args": {"symbol": "NOPE", "start": "2026-11-01", "end": "2026-11-06"}, "expect": {"raises": "NotFound"}},
+    {"capability": "actions", "args": {"symbol": "TCS"}, "expect": {"min_rows": 1}},
+    {"capability": "fundamentals", "args": {"symbol": "TCS"}, "expect": {"min_rows": 1}},
+    {"capability": "fundamentals", "args": {"symbol": "NOPE"}, "expect": {"raises": "NotFound"}},
+    {"capability": "index", "args": {"start": "2026-11-01"}, "expect": {"min_rows": 2}}
+  ],
+  "refusal": {"capability": "bars", "args": {"symbol": "TCS", "start": "2026-11-01", "end": "2026-11-06"}}
+}

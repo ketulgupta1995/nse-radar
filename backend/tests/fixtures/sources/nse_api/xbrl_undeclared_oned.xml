@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xbrli:xbrl xmlns:in-bse-fin="http://www.bseindia.com/xbrl/fin/2020-03-31/in-bse-fin" xmlns:xbrldi="http://xbrl.org/2006/xbrldi" xmlns:xbrli="http://www.xbrl.org/2003/instance" xmlns:link="http://www.xbrl.org/2003/linkbase" xmlns:xlink="http://www.w3.org/1999/xlink">
+<link:schemaRef xlink:type="simple" xlink:href="Ind-AS_entry_point_2020-03-31.xsd"/>
+<xbrli:context id="OneOperatingExpenses01D"><xbrli:entity><xbrli:identifier scheme="http://www.nseindia.com/NSESymbol">INFY</xbrli:identifier></xbrli:entity><xbrli:period><xbrli:startDate>2021-04-01</xbrli:startDate><xbrli:endDate>2021-06-30</xbrli:endDate></xbrli:period><xbrli:scenario><xbrldi:explicitMember dimension="in-bse-fin:ExpenseAxis">in-bse-fin:CostOfMaterialsConsumedMember</xbrldi:explicitMember></xbrli:scenario></xbrli:context>
+<xbrli:context id="OneOtherExpenses01D"><xbrli:entity><xbrli:identifier scheme="http://www.nseindia.com/NSESymbol">INFY</xbrli:identifier></xbrli:entity><xbrli:period><xbrli:startDate>2021-04-01</xbrli:startDate><xbrli:endDate>2021-06-30</xbrli:endDate></xbrli:period><xbrli:scenario><xbrldi:explicitMember dimension="in-bse-fin:ExpenseAxis">in-bse-fin:OtherExpensesMember</xbrldi:explicitMember></xbrli:scenario></xbrli:context>
+<in-bse-fin:RevenueFromOperations contextRef="OneD" unitRef="INR" decimals="2">278960000000.00</in-bse-fin:RevenueFromOperations>
+<in-bse-fin:OtherIncome contextRef="OneD" unitRef="INR" decimals="2">7240000000.00</in-bse-fin:OtherIncome>
+<in-bse-fin:Expenses contextRef="OneD" unitRef="INR" decimals="2">217500000000.00</in-bse-fin:Expenses>
+<in-bse-fin:ProfitBeforeTax contextRef="OneD" unitRef="INR" decimals="2">68700000000.00</in-bse-fin:ProfitBeforeTax>
+<in-bse-fin:ProfitLossForPeriod contextRef="OneD" unitRef="INR" decimals="2">51950000000.00</in-bse-fin:ProfitLossForPeriod>
+<in-bse-fin:BasicEarningsLossPerShareFromContinuingAndDiscontinuedOperations contextRef="OneD" unitRef="INRPerShare" decimals="2">12.21</in-bse-fin:BasicEarningsLossPerShareFromContinuingAndDiscontinuedOperations>
+</xbrli:xbrl>

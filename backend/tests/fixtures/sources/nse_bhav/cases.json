@@ -1,0 +1,12 @@
+{
+  "transport": {
+    "https://nsearchives.nseindia.com/content/cm/BhavCopy_NSE_CM_0_0_0_20261106_F_0000.csv.zip": {"status": 200, "file": "bhav_udiff_20261106.csv"},
+    "https://nsearchives.nseindia.com/content/historical/EQUITIES/2015/JAN/cm02JAN2015bhav.csv.zip": {"status": 200, "file": "bhav_old_20150102.csv"}
+  },
+  "cases": [
+    {"capability": "bars", "args": {"d": "2026-11-06"}, "expect": {"min_rows": 3, "symbols": ["HDFCBANK"]}},
+    {"capability": "bars", "args": {"d": "2015-01-02"}, "expect": {"min_rows": 3, "symbols": ["HDFCBANK"]}},
+    {"capability": "bars", "args": {"d": "2026-11-07"}, "expect": {"raises": "NotFound"}}
+  ],
+  "refusal": {"capability": "bars", "args": {"d": "2026-11-06"}}
+}

@@ -1,0 +1,423 @@
+[
+ {
+  "name": "Breakout on volume",
+  "description": "Price just broke above its 3-month high on at least twice the usual volume, in a long-term uptrend.",
+  "rule": {
+   "all": [
+    {
+     "left": {
+      "ind": "close",
+      "params": {}
+     },
+     "op": "crosses_above",
+     "right": {
+      "ind": "highest",
+      "params": {
+       "n": 63
+      }
+     }
+    },
+    {
+     "left": {
+      "ind": "volume_ratio",
+      "params": {
+       "n": 20
+      }
+     },
+     "op": ">=",
+     "right": {
+      "value": 2
+     }
+    },
+    {
+     "left": {
+      "ind": "close",
+      "params": {}
+     },
+     "op": ">",
+     "right": {
+      "ind": "sma",
+      "params": {
+       "n": 200
+      }
+     }
+    }
+   ]
+  }
+ },
+ {
+  "name": "Quality in uptrend",
+  "description": "Profitable, low-debt, growing companies whose price is also trending up.",
+  "rule": {
+   "all": [
+    {
+     "left": {
+      "fund": "roce_pct"
+     },
+     "op": ">=",
+     "right": {
+      "value": 15
+     }
+    },
+    {
+     "left": {
+      "fund": "debt_to_equity"
+     },
+     "op": "<=",
+     "right": {
+      "value": 0.5
+     }
+    },
+    {
+     "left": {
+      "fund": "profit_growth_3y_pct"
+     },
+     "op": ">=",
+     "right": {
+      "value": 10
+     }
+    },
+    {
+     "left": {
+      "ind": "close",
+      "params": {}
+     },
+     "op": ">",
+     "right": {
+      "ind": "sma",
+      "params": {
+       "n": 200
+      }
+     }
+    },
+    {
+     "left": {
+      "ind": "rel_strength",
+      "params": {
+       "n": 63
+      }
+     },
+     "op": ">",
+     "right": {
+      "value": 0
+     }
+    }
+   ]
+  }
+ },
+ {
+  "name": "Tight base near highs",
+  "description": "Quiet, narrow trading near the yearly high on low volume, often before a move.",
+  "rule": {
+   "all": [
+    {
+     "left": {
+      "ind": "range_pct",
+      "params": {
+       "n": 40
+      }
+     },
+     "op": "<",
+     "right": {
+      "value": 15
+     }
+    },
+    {
+     "left": {
+      "ind": "pct_from_high",
+      "params": {
+       "n": 252
+      }
+     },
+     "op": ">",
+     "right": {
+      "value": -10
+     }
+    },
+    {
+     "left": {
+      "ind": "volume_ratio",
+      "params": {
+       "n": 20
+      }
+     },
+     "op": "<",
+     "right": {
+      "value": 1
+     }
+    }
+   ]
+  }
+ },
+ {
+  "name": "Quality trend riders",
+  "description": "Trend riders, but only profitable, low-debt, growing companies. In tests this halved the swings for the same return. Best paired with the Position exits in Backtests. Also waits for most stocks to be above their 200-day average.",
+  "rule": {
+   "all": [
+    {
+     "left": {
+      "fund": "roce_pct"
+     },
+     "op": ">=",
+     "right": {
+      "value": 15
+     }
+    },
+    {
+     "left": {
+      "fund": "debt_to_equity"
+     },
+     "op": "<=",
+     "right": {
+      "value": 0.5
+     }
+    },
+    {
+     "left": {
+      "fund": "profit_growth_3y_pct"
+     },
+     "op": ">=",
+     "right": {
+      "value": 10
+     }
+    },
+    {
+     "left": {
+      "ind": "close",
+      "params": {}
+     },
+     "op": ">",
+     "right": {
+      "ind": "sma",
+      "params": {
+       "n": 50
+      }
+     }
+    },
+    {
+     "left": {
+      "ind": "sma",
+      "params": {
+       "n": 50
+      }
+     },
+     "op": ">",
+     "right": {
+      "ind": "sma",
+      "params": {
+       "n": 200
+      }
+     }
+    },
+    {
+     "left": {
+      "ind": "rel_strength",
+      "params": {
+       "n": 126
+      }
+     },
+     "op": ">",
+     "right": {
+      "value": 10
+     }
+    },
+    {
+     "left": {
+      "ind": "pct_from_high",
+      "params": {
+       "n": 252
+      }
+     },
+     "op": ">",
+     "right": {
+      "value": -15
+     }
+    },
+    {
+     "left": {
+      "ind": "index_vs_sma",
+      "params": {
+       "n": 200
+      }
+     },
+     "op": ">",
+     "right": {
+      "value": 0
+     }
+    },
+    {
+     "left": {
+      "ind": "breadth_above_sma",
+      "params": {
+       "n": 200
+      }
+     },
+     "op": ">",
+     "right": {
+      "value": 50
+     }
+    }
+   ]
+  }
+ },
+ {
+  "name": "Steady quality leaders",
+  "description": "Quality companies that are clear market leaders: well ahead of the Nifty 500 and within 10% of their yearly high. Fewer matches; made for a wide portfolio of 30 slots with the Trend exits. Smallest drawdowns in tests. Also waits for most stocks to be above their 200-day average.",
+  "rule": {
+   "all": [
+    {
+     "left": {
+      "fund": "roce_pct"
+     },
+     "op": ">=",
+     "right": {
+      "value": 15
+     }
+    },
+    {
+     "left": {
+      "fund": "debt_to_equity"
+     },
+     "op": "<=",
+     "right": {
+      "value": 0.5
+     }
+    },
+    {
+     "left": {
+      "ind": "close",
+      "params": {}
+     },
+     "op": ">",
+     "right": {
+      "ind": "sma",
+      "params": {
+       "n": 50
+      }
+     }
+    },
+    {
+     "left": {
+      "ind": "sma",
+      "params": {
+       "n": 50
+      }
+     },
+     "op": ">",
+     "right": {
+      "ind": "sma",
+      "params": {
+       "n": 200
+      }
+     }
+    },
+    {
+     "left": {
+      "ind": "rel_strength",
+      "params": {
+       "n": 126
+      }
+     },
+     "op": ">",
+     "right": {
+      "value": 20
+     }
+    },
+    {
+     "left": {
+      "ind": "pct_from_high",
+      "params": {
+       "n": 252
+      }
+     },
+     "op": ">",
+     "right": {
+      "value": -10
+     }
+    },
+    {
+     "left": {
+      "ind": "index_vs_sma",
+      "params": {
+       "n": 200
+      }
+     },
+     "op": ">",
+     "right": {
+      "value": 0
+     }
+    },
+    {
+     "left": {
+      "ind": "breadth_above_sma",
+      "params": {
+       "n": 200
+      }
+     },
+     "op": ">",
+     "right": {
+      "value": 50
+     }
+    }
+   ]
+  }
+ },
+ {
+  "name": "52-week high breakout",
+  "description": "Price just closed above its highest level of the past year, on above-normal volume, while the market is in an uptrend.",
+  "rule": {"all": [
+   {"left": {"ind": "close", "params": {}}, "op": "crosses_above", "right": {"ind": "highest", "params": {"n": 252}}},
+   {"left": {"ind": "volume_ratio", "params": {"n": 20}}, "op": ">=", "right": {"value": 1.5}},
+   {"left": {"ind": "index_vs_sma", "params": {"n": 200}}, "op": ">", "right": {"value": 0}}
+  ]}
+ },
+ {
+  "name": "Promoters buying, in uptrend",
+  "description": "The founders or parent company raised their stake over the past year, and the price is trending up.",
+  "rule": {"all": [
+   {"left": {"fund": "promoter_change_1y_pp"}, "op": ">", "right": {"value": 0}},
+   {"left": {"ind": "close", "params": {}}, "op": ">", "right": {"ind": "sma", "params": {"n": 200}}},
+   {"left": {"ind": "rel_strength", "params": {"n": 126}}, "op": ">", "right": {"value": 0}}
+  ]}
+ },
+ {
+  "name": "Breadth trend riders",
+  "description": "Uptrend leaders, but only while most stocks are in uptrends too. Breadth caught the 2018 small-cap fall that the index filter missed.",
+  "rule": {"all": [
+   {"left": {"ind": "close", "params": {}}, "op": ">", "right": {"ind": "sma", "params": {"n": 50}}},
+   {"left": {"ind": "sma", "params": {"n": 50}}, "op": ">", "right": {"ind": "sma", "params": {"n": 200}}},
+   {"left": {"ind": "rel_strength", "params": {"n": 126}}, "op": ">", "right": {"value": 10}},
+   {"left": {"ind": "pct_from_high", "params": {"n": 252}}, "op": ">", "right": {"value": -15}},
+   {"left": {"ind": "breadth_above_sma", "params": {"n": 200}}, "op": ">", "right": {"value": 50}}
+  ]}
+ },
+ {
+  "name": "Results winners",
+  "description": "Stocks that jumped at least 5% on their latest quarterly results in the last two months. Strong reactions often keep drifting up.",
+  "rule": {"all": [
+   {"left": {"ind": "results_move", "params": {"k": 2}}, "op": ">=", "right": {"value": 5}},
+   {"left": {"ind": "days_since_results", "params": {}}, "op": "<=", "right": {"value": 40}},
+   {"left": {"ind": "close", "params": {}}, "op": ">", "right": {"ind": "sma", "params": {"n": 200}}},
+   {"left": {"ind": "traded_value_cr", "params": {"n": 20}}, "op": ">=", "right": {"value": 5}}
+  ]}
+ },
+ {
+  "name": "Leaders in leading industries",
+  "description": "Stocks beating their own industry, in an industry that is beating the market.",
+  "rule": {"all": [
+   {"left": {"ind": "industry_strength", "params": {"n": 63}}, "op": ">", "right": {"value": 0}},
+   {"left": {"ind": "industry_rs", "params": {"n": 63}}, "op": ">", "right": {"value": 0}},
+   {"left": {"ind": "rel_strength", "params": {"n": 126}, "rank": true}, "op": ">=", "right": {"value": 80}},
+   {"left": {"ind": "close", "params": {}}, "op": ">", "right": {"ind": "sma", "params": {"n": 50}}}
+  ]}
+ },
+ {
+  "name": "Short dip in uptrend",
+  "description": "A stock in a long uptrend that fell sharply for a couple of days. Meant for short holds of about a week: pair it with the Short dip exits.",
+  "rule": {"all": [
+   {"left": {"ind": "rsi", "params": {"n": 2}}, "op": "<", "right": {"value": 10}},
+   {"left": {"ind": "close", "params": {}}, "op": ">", "right": {"ind": "sma", "params": {"n": 200}}},
+   {"left": {"ind": "traded_value_cr", "params": {"n": 20}}, "op": ">=", "right": {"value": 5}}
+  ]}
+ }
+]

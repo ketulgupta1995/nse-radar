@@ -1,0 +1,12 @@
+[
+  {"category": "results", "alert": true, "keywords": ["financial result", "results for the quarter"]},
+  {"category": "pledge", "alert": true, "severity": "warn", "keywords": ["pledge", "encumbrance"]},
+  {"category": "block_deal", "alert": true, "keywords": ["bulk deal", "block deal"]},
+  {"category": "order_win", "alert": true, "keywords": ["order", "contract", "letter of award", "loa"]},
+  {"category": "board_meeting", "alert": true, "keywords": ["board meeting"]},
+  {"category": "credit_rating", "alert": true, "keywords": ["credit rating"]},
+  {"category": "dividend", "alert": false, "keywords": ["dividend"]},
+  {"category": "insider", "alert": false, "keywords": ["sast", "insider trading", "reg 7(2)"]},
+  {"category": "routine", "alert": false, "hidden": true, "keywords": ["trading window", "newspaper publication", "loss of share certificate", "duplicate share", "compliance certificate"]},
+  {"category": "other_important", "alert": true, "keywords": ["acquisition", "merger", "resignation", "fire"]}
+]
