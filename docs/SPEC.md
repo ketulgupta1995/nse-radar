@@ -1687,10 +1687,10 @@ Tests run in `local` mode on SQLite, as today. Nothing in tests touches Turso, G
 
 `python -m app.jobs.drain [--tick] [--budget-min N] [--lane background|interactive|all]` (N004), run with cwd `backend/`:
 
-1. `db.sync()` (replica), `db.init_db()` (migrations, defaults, schedules), `plugins.import_all(...)` exactly as `main.lifespan` does, `runner.recover_on_startup()`.
+1. `db.sync()` (replica), `db.init_db()` (migrations, defaults), `bootstrap.load_plugins()`, `scheduler.ensure_schedules()` (needs the registered jobs), `runner.recover_on_startup()`.
 2. With `--tick`: `scheduler.tick(now)`, so every due job, including the startup catch-up (§6.2), is enqueued.
 3. Loop: `runner.run_one("interactive")`, else `runner.run_one("background")`, until nothing is queued or the budget (default 100 min) runs out.
-4. **Budget reached:** the running job is asked to stop (`request_stop`, which every job already honours, §6), finishes as `stopped`, and is enqueued again with the same params and trigger `resume`. Source jobs are gap-proof and item-based (`job_items`), so the next drain continues where this one stopped. The drain exits 0.
+4. **Budget reached:** the running job is asked to stop (`request_stop`, which every job already honours, §6), ends `cancelled` with `stop_requested=1` (the runner's way of recording a stop), and is enqueued again with the same params and trigger `system` (the `job_runs.trigger` CHECK has no `resume`; decided after N004). Source jobs are gap-proof and item-based (`job_items`), so the next drain continues where this one stopped. The drain exits 0.
 5. Exit: `db.sync()`, then print a summary of **counts only** (jobs run, ok/failed, rows written, minutes). See §17.8 on what may be logged.
 
 **Replica and price store between runs:** the workflow restores `data/replica.db` and `data/cache/price_store.pkl` from `actions/cache` (key `replica-<run_id>`, restore-key `replica-`), and saves them at the end. A cache miss means a full replica sync (~9M rows read, fine a few times a month). Writes made by Vercel since the last run arrive with `db.sync()`.

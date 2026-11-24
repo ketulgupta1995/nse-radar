@@ -7,26 +7,23 @@ from fastapi import APIRouter, FastAPI
 from fastapi.responses import FileResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 
-from app import config, db
-from app.analytics import custom_indicators
+from app import bootstrap, config, db
 from app.jobs import runner, scheduler
 from app.plugins import import_all
-from app.sources.jobs import register_source_jobs
 
 log = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    if config.RUNTIME == "vercel":  # no migrations, no threads: jobs run in the drain (§17.2)
+        bootstrap.load_plugins()
+        log.info("started (vercel)")
+        yield
+        return
     db.init_db()
     runner.recover_on_startup()
-    import_all("app.sources.adapters")
-    import_all("app.jobs.defs")
-    register_source_jobs()
-    import_all("app.alerts.scanners")
-    import_all("app.ai.providers")
-    import_all("app.ai.tasks")
-    custom_indicators.load_approved()
+    bootstrap.load_plugins()
     if os.environ.get("STOCK_NO_THREADS") != "1":
         runner.start_worker()
     scheduler.startup()
