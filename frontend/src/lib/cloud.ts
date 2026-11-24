@@ -4,6 +4,11 @@ import type { Runtime } from "../api/types";
 
 export interface CloudInfo {
   runtime: Runtime;
+  dispatch_configured?: boolean;
+  last_dispatch_at?: string | null;
+  queued?: number;
+  running?: number;
+  oldest_queued_at?: string | null;
 }
 
 const LOCAL: CloudInfo = { runtime: "local" };

@@ -4,7 +4,9 @@ import type { DataHealth as Health, JobInfo, JobsResponse, SchedulePatch, Source
 import Explain from "../components/Explain";
 import DataChecks from "../components/jobs/DataChecks";
 import DataHealth from "../components/jobs/DataHealth";
-import JobRow from "../components/jobs/JobRow";
+import JobRow, { JobCard } from "../components/jobs/JobRow";
+import { useCloud } from "@/lib/cloud";
+import { useIsPhone } from "@/lib/useIsPhone";
 import RunDrawer from "../components/jobs/RunDrawer";
 import RunHistory, { usePoll } from "../components/jobs/RunHistory";
 import { Badge } from "@/components/ui/badge";
@@ -24,6 +26,8 @@ function sourceOff(jobs: JobInfo[]): boolean {
 }
 
 export default function Jobs() {
+  const phone = useIsPhone();
+  const { runtime } = useCloud();
   const [data, setData] = useState<JobsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [openRun, setOpenRun] = useState<number | null>(null);
@@ -68,6 +72,17 @@ export default function Jobs() {
     await load();
   }
 
+  const handlers = {
+    onOpen: setOpenRun,
+    onRun: (n: string) =>
+      act(async () => {
+        const r = await api.post<{ run_id: number }>(`/jobs/${n}/run`, {});
+        setOpenRun(r.run_id);
+      }, "Job started."),
+    onStop: (id: number) => act(() => api.post(`/jobs/runs/${id}/stop`), "Stop requested."),
+    onSchedule: (n: string, p: SchedulePatch) => act(() => api.put(`/jobs/${n}/schedule`, p), "Schedule saved."),
+  };
+
   const groups = new Map<string, JobInfo[]>();
   for (const j of data?.jobs ?? []) groups.set(j.group, [...(groups.get(j.group) ?? []), j]);
   const ordered = [...groups.keys()].sort((a, b) => (a === "app" ? -1 : b === "app" ? 1 : a.localeCompare(b)));
@@ -75,6 +90,11 @@ export default function Jobs() {
   return (
     <div>
       <h1>Jobs</h1>
+      {runtime === "vercel" && (
+        <p className="muted">
+          Jobs run in the cloud worker (GitHub Actions), twice a day on schedule and within a couple of minutes when you press Run now.
+        </p>
+      )}
       <p>
         <label>
           <input
@@ -105,6 +125,13 @@ export default function Jobs() {
             <h2 style={{ display: "inline" }}>{groupTitle(g, labels)}</h2>
             {sourceOff(groups.get(g)!) && <Badge className="ml-2">off</Badge>}
           </summary>
+          {phone ? (
+            <div className="mt-2">
+              {groups.get(g)!.map((j) => (
+                <JobCard key={j.name} job={j} historyKey={historyKey} {...handlers} />
+              ))}
+            </div>
+          ) : (
           <div className="table-wrap">
           <table>
             <thead>
@@ -119,24 +146,12 @@ export default function Jobs() {
             </thead>
             <tbody>
               {groups.get(g)!.map((j) => (
-                <JobRow
-                  key={j.name}
-                  job={j}
-                  historyKey={historyKey}
-                  onOpen={setOpenRun}
-                  onRun={(n) =>
-                    act(async () => {
-                      const r = await api.post<{ run_id: number }>(`/jobs/${n}/run`, {});
-                      setOpenRun(r.run_id);
-                    }, "Job started.")
-                  }
-                  onStop={(id) => act(() => api.post(`/jobs/runs/${id}/stop`), "Stop requested.")}
-                  onSchedule={(n, p: SchedulePatch) => act(() => api.put(`/jobs/${n}/schedule`, p), "Schedule saved.")}
-                />
+                <JobRow key={j.name} job={j} historyKey={historyKey} {...handlers} />
               ))}
             </tbody>
           </table>
           </div>
+          )}
         </details>
         </Card>
       ))}

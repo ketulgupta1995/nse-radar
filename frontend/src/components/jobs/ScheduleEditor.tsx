@@ -3,6 +3,8 @@ import type { Schedule, ScheduleKind, SchedulePatch } from "../../api/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { useIsPhone } from "@/lib/useIsPhone";
+import { cn } from "@/lib/utils";
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
@@ -28,6 +30,7 @@ interface Props {
 }
 
 export default function ScheduleEditor({ schedule, onSave, onCancel }: Props) {
+  const phone = useIsPhone();
   const [kind, setKind] = useState<ScheduleKind>(schedule.kind);
   const [intervalMin, setIntervalMin] = useState(schedule.interval_min ?? 60);
   const [atTime, setAtTime] = useState(schedule.at_time ?? "19:30");
@@ -42,7 +45,7 @@ export default function ScheduleEditor({ schedule, onSave, onCancel }: Props) {
   }
 
   return (
-    <div className="sched-editor">
+    <div className={cn("sched-editor", phone && "flex-col items-stretch [&_input:not([type=checkbox])]:w-full [&_select]:w-full")}>
       <label>
         How often{" "}
         <Select aria-label="Kind" value={kind} onChange={(e) => setKind(e.target.value as ScheduleKind)}>

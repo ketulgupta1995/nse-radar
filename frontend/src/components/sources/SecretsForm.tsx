@@ -26,9 +26,10 @@ export default function SecretsForm({ secrets, onSave }: Props) {
       <strong>Keys</strong>
       {keys.map((k) => (
         <div key={k}>
-          <label>
+          <label className="block">
             {k}{" "}
             <Input
+              className="w-full"
               type="password"
               autoComplete="off"
               value={values[k] ?? ""}

@@ -11,6 +11,13 @@ import type { ThemeChoice } from "../lib/theme";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardHeader, CardTitle } from "@/components/ui/card";
+import { useCloud } from "@/lib/cloud";
+import type { CloudInfo } from "@/lib/cloud";
+import { useIsPhone } from "@/lib/useIsPhone";
+import { cn } from "@/lib/utils";
+import { relTime } from "../components/jobs/RunHistory";
 
 const WEIGHTS: [string, string, string][] = [
   ["rs", "Relative strength", "How much the stock has outperformed the market lately. Higher weight favours recent leaders."],
@@ -31,9 +38,44 @@ const COSTS: [keyof CostModel, string, string][] = [
   ["slippage_pct", "Slippage %", "Allowance for getting a slightly worse price than the one you saw."],
 ];
 
-function Field({ label, help, children }: { label: string; help?: string; children: ReactNode }) {
+function waiting(iso: string): string {
+  const mins = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
+  return mins < 1 ? "waiting under a minute" : `waiting ${mins} min`;
+}
+
+function CloudSection({ cloud, onLogout }: { cloud: CloudInfo; onLogout: () => void }) {
+  const queued = cloud.queued ?? 0;
   return (
-    <label className="field">
+    <Card className="settings-section mb-4" aria-label="Cloud">
+      <CardHeader><CardTitle>Cloud</CardTitle></CardHeader>
+      <p>
+        Jobs waiting to start: <b>{queued}</b>
+        {queued > 0 && cloud.oldest_queued_at && <span className="muted"> ({waiting(cloud.oldest_queued_at)})</span>}
+        <Explain text="Jobs you asked for (Run now) that the cloud worker hasn't picked up yet." />
+      </p>
+      <p>
+        Jobs running now: <b>{cloud.running ?? 0}</b>
+      </p>
+      <p>
+        Last time the worker was started: <b>{cloud.last_dispatch_at ? relTime(cloud.last_dispatch_at) : "never"}</b>
+      </p>
+      {cloud.dispatch_configured === false && (
+        <Badge variant="warning">
+          Run now can't start the worker: the dispatch token is missing; jobs wait for the next schedule
+        </Badge>
+      )}
+      <p className="muted mt-3">Logs this browser out. You will need the password to get back in.</p>
+      <Button variant="outline" size="sm" type="button" onClick={onLogout}>
+        Log out
+      </Button>
+    </Card>
+  );
+}
+
+function Field({ label, help, children }: { label: string; help?: string; children: ReactNode }) {
+  const phone = useIsPhone();
+  return (
+    <label className={cn("field", phone && "!flex-col !items-stretch !gap-1 [&_.slider]:w-full [&_.slider_input]:flex-1 [&_input:not([type=range]):not([type=checkbox])]:w-full [&_select]:w-full")}>
       <span>
         {label}
         {help && <Explain text={help} />}
@@ -55,6 +97,7 @@ export default function Settings() {
   const [reviewing, setReviewing] = useState<CustomIndicator | null>(null);
   const [indError, setIndError] = useState<string | null>(null);
   const [authRequired, setAuthRequired] = useState(false);
+  const cloud = useCloud();
 
   const loadIndicators = useCallback(() => {
     api
@@ -264,7 +307,9 @@ export default function Settings() {
         {backup && <p role="status">{backup}</p>}
       </section>
 
-      {authRequired && (
+      {cloud.runtime === "vercel" && <CloudSection cloud={cloud} onLogout={() => void logout()} />}
+
+      {authRequired && cloud.runtime !== "vercel" && (
         <section className="card settings-section">
           <h2>Account</h2>
           <p className="muted">Logs this browser out. You will need the password to get back in.</p>

@@ -6,11 +6,13 @@ import PriorityPanel from "../components/sources/PriorityPanel";
 import SourceCard from "../components/sources/SourceCard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/toaster";
+import { useIsPhone } from "@/lib/useIsPhone";
 
 export default function Sources() {
   const [sources, setSources] = useState<SourceInfo[]>([]);
   const [priority, setPriority] = useState<PriorityResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const phone = useIsPhone();
   const [coverageKey, setCoverageKey] = useState(0);
 
   const load = useCallback(async () => {
@@ -51,7 +53,7 @@ export default function Sources() {
         Where the data comes from. Switch a source off to stop using it; set the order below to choose which one wins.
       </p>
       {error && <p className="neg">{error}</p>}
-      <div className="my-4 grid grid-cols-[repeat(auto-fill,minmax(320px,1fr))] gap-4">
+      <div className={phone ? "my-4 flex flex-col gap-4" : "my-4 grid grid-cols-[repeat(auto-fill,minmax(320px,1fr))] gap-4"}>
         {sources.length === 0 && !error && <Skeleton className="h-32" />}
         {sources.map((s) => (
           <SourceCard

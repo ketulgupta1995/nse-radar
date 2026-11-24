@@ -3,6 +3,8 @@ import { ApiError, api } from "../../api/client";
 import type { LogLine, RunDetail } from "../../api/types";
 import { Progress, StatusChip, fmtDuration, relTime, usePoll } from "./RunHistory";
 import { Button } from "@/components/ui/button";
+import { useIsPhone } from "@/lib/useIsPhone";
+import { cn } from "@/lib/utils";
 
 interface Props {
   runId: number;
@@ -17,6 +19,7 @@ export default function RunDrawer({ runId, onClose, onChanged, onOpenRun }: Prop
   const [error, setError] = useState<string | null>(null);
   const lastId = useRef(0);
   const logBox = useRef<HTMLDivElement>(null);
+  const phone = useIsPhone();
 
   useEffect(() => {
     setRun(null);
@@ -59,7 +62,13 @@ export default function RunDrawer({ runId, onClose, onChanged, onOpenRun }: Prop
   }
 
   return (
-    <aside className="fixed inset-y-0 right-0 z-20 w-[min(520px,100vw)] overflow-auto border-l border-border bg-card p-4 shadow-[-4px_0_16px_#0003]" aria-label="Run details">
+    <aside
+      className={cn(
+        "fixed inset-y-0 right-0 z-20 overflow-auto bg-card p-4",
+        phone ? "left-0 w-screen" : "w-[min(520px,100vw)] border-l border-border shadow-[-4px_0_16px_#0003]",
+      )}
+      aria-label="Run details"
+    >
       <div className="flex items-center justify-between gap-2">
         <h2>
           Run #{runId} {run && <span className="muted">{run.job}</span>}
@@ -117,7 +126,7 @@ export default function RunDrawer({ runId, onClose, onChanged, onOpenRun }: Prop
         </>
       )}
       <h3>Log</h3>
-      <div className="log" ref={logBox}>
+      <div className={cn("log", phone && "max-h-[50vh]")} ref={logBox}>
         {logs.length === 0 && <span className="muted">No log lines yet.</span>}
         {logs.map((l) => (
           <div key={l.id} className={`log-${l.level}`}>

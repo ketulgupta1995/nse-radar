@@ -5,6 +5,7 @@ import type { PriceCheck, UnparsedAction } from "../../api/types";
 import { shortDay } from "../../lib/dates";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useIsPhone } from "@/lib/useIsPhone";
 
 interface Props {
   labels: Record<string, string>;
@@ -35,6 +36,7 @@ export function explain(c: PriceCheck, labels: Record<string, string>): string {
 }
 
 export default function DataChecks({ labels, onChanged }: Props) {
+  const phone = useIsPhone();
   const [checks, setChecks] = useState<PriceCheck[]>([]);
   const [unparsed, setUnparsed] = useState<UnparsedAction[]>([]);
   const [showIgnored, setShowIgnored] = useState(false);
@@ -88,6 +90,30 @@ export default function DataChecks({ labels, onChanged }: Props) {
       </p>
       {checks.length === 0 ? (
         <p className="muted">No data issues. 🎉</p>
+      ) : phone ? (
+        checks.map((c) => (
+          <div key={c.id} className="mb-3 rounded-md border border-border p-3">
+            <p>
+              <Link to={`/stock/${c.symbol}`}>{c.symbol}</Link> · {shortDay(c.date)} · <b>{KIND_LABEL[c.kind]}</b>
+            </p>
+            <p>
+              {explain(c, labels)}
+              {c.status !== "open" && <span className="muted"> ({c.status})</span>}
+            </p>
+            {c.status === "open" && (
+              <div className="flex flex-wrap gap-2">
+                {((c.kind === "mismatch" && c.detail.ex_date) || c.kind === "adjustment_jump") && c.detail.suggested_factor && (
+                  <Button variant="outline" size="sm" type="button" onClick={() => act(() => api.post(`/data/checks/${c.id}`, { action: "apply_factor" }))}>
+                    Apply suggested factor
+                  </Button>
+                )}
+                <Button variant="outline" size="sm" type="button" onClick={() => act(() => api.post(`/data/checks/${c.id}`, { action: "ignore" }))}>
+                  Ignore
+                </Button>
+              </div>
+            )}
+          </div>
+        ))
       ) : (
         <div className="table-wrap">
         <table>
@@ -144,6 +170,44 @@ export default function DataChecks({ labels, onChanged }: Props) {
       </p>
       {unparsed.length === 0 ? (
         <p className="muted">None.</p>
+      ) : phone ? (
+        unparsed.map((u) => {
+          const k = key(u);
+          const f = Number(factors[k]);
+          return (
+            <div key={k} className="mb-3 rounded-md border border-border p-3">
+              <p>
+                <Link to={`/stock/${u.symbol}`}>{u.symbol}</Link> · ex-date {shortDay(u.ex_date)}
+              </p>
+              <p>{u.subject}</p>
+              <div className="flex items-center gap-2">
+                <Input
+                  className="flex-1"
+                  aria-label={`Factor for ${u.symbol} ${u.ex_date}`}
+                  inputMode="decimal"
+                  placeholder="Factor"
+                  value={factors[k] ?? ""}
+                  onChange={(e) => setFactors({ ...factors, [k]: e.target.value })}
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  type="button"
+                  disabled={!(f > 0)}
+                  onClick={() =>
+                    act(async () => {
+                      await api.post("/data/manual-adjustment", { symbol: u.symbol, ex_date: u.ex_date, factor: f });
+                      setSaved((s) => new Set(s).add(k));
+                    })
+                  }
+                >
+                  Save
+                </Button>
+                {saved.has(k) && <span className="pos"> saved</span>}
+              </div>
+            </div>
+          );
+        })
       ) : (
         <div className="table-wrap">
         <table>
