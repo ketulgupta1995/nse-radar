@@ -1,0 +1,34 @@
+# N001 only: deleted by N006. Runs on a push to the `spike` branch (no secrets needed) and
+# commits the JSON result (status codes and timings only) to the `spike-results` branch.
+name: spike
+on:
+  push:
+    branches: [spike]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  spike:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install -q -e backend
+      - name: Probe sources and Turso latency from the runner
+        env:
+          SPIKE_WHERE: github-actions
+        run: python scripts/spike_cloud.py --sources --latency "${{ vars.SPIKE_TURSO_HOST || 'nse-radar-spike-kgpu.aws-us-east-1.turso.io' }}" --out out/spike-actions.json
+      - name: Save the result to the spike-results branch
+        run: |
+          git config user.name "spike-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git fetch origin spike-results || true
+          git checkout -B spike-results
+          git rm -rq --cached . || true
+          mkdir -p results && cp out/spike-actions.json "results/spike-$(date -u +%Y%m%dT%H%M%S).json"
+          git add results
+          git commit -qm "spike result"
+          git push -f origin spike-results
