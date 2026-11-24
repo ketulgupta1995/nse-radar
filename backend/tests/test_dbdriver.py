@@ -206,7 +206,7 @@ def test_remote_mode_selected_by_env(fake_libsql, monkeypatch):
     assert fake_libsql.calls[-1] == {"database": "libsql://test-db.example", "sync_url": None,
                                      "auth_token": "tok", "isolation_level": None}
     pragmas = [e[1] for e in fake_libsql.log if e[1].upper().startswith("PRAGMA")]
-    assert pragmas == ["PRAGMA foreign_keys=ON"]  # file PRAGMAs are refused by Turso
+    assert pragmas == []  # Turso refuses the file PRAGMAs and enforces foreign keys without one
     db.sync()  # remote: no-op
     assert all(c.synced == 0 for c in fake_libsql.conns)
 

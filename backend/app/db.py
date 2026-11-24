@@ -92,7 +92,10 @@ def tx() -> Iterator[sqlite3.Connection]:
     stack = _pending_stack()
     stack.append([])
     try:
-        conn.execute("BEGIN IMMEDIATE")
+        if getattr(conn, "replica", False):  # reads stay local, writes go out in one batch at COMMIT
+            conn.begin_lazy()  # type: ignore[attr-defined]
+        else:
+            conn.execute("BEGIN IMMEDIATE")
         try:
             yield conn
         except BaseException:
@@ -174,6 +177,21 @@ def sync() -> None:
         conn.sync()  # type: ignore[attr-defined]
     finally:
         conn.close()
+
+
+_last_sync = [0.0]
+
+
+def sync_if_due(every_s: float) -> None:
+    """`sync()` at most once per `every_s` seconds (a running job polling for stop requests)."""
+    if not (config.TURSO_URL and config.REPLICA_PATH):
+        return
+    import time
+
+    now = time.monotonic()
+    if now - _last_sync[0] >= every_s:
+        _last_sync[0] = now
+        sync()
 
 
 def schema_status() -> str:

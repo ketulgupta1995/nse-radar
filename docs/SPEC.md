@@ -1672,7 +1672,7 @@ GITHUB_REPO = os.environ.get("GITHUB_REPO", "")         # "owner/nse-radar" (Ver
 
 | | `local` (dev, tests) | `vercel` | `actions` |
 |---|---|---|---|
-| Database | SQLite file `DB_PATH` (or Turso if `TURSO_DATABASE_URL` is set: dev against the live DB, like reel-radar) | Turso **remote** (every query is an HTTPS round trip) | Turso **embedded replica** at `REPLICA_PATH`: reads are local, writes go to Turso, `db.sync()` pulls |
+| Database | SQLite file `DB_PATH` (or Turso if `TURSO_DATABASE_URL` is set: dev against the live DB, like reel-radar) | Turso **remote** (every query is an HTTPS round trip) | Turso **embedded replica** at `REPLICA_PATH`: reads are local, writes go to Turso, `db.sync()` pulls. `db.tx()` is a *lazy* transaction: reads local, writes held and sent as one batch at COMMIT; it goes remote only when a write's result (`rowcount`, `lastrowid`) or a read after a write is needed (docs/CLOUD_SPIKE.md, "First drain") |
 | Worker + scheduler threads | yes, as on the laptop | **never** | never (the drain CLI runs jobs in the foreground, §17.3) |
 | `init_db()` / migrations | at startup | **never** (reads `user_version`; if it's behind `SCHEMA_VERSION`, `/api/health` says `"schema": "update pending"`) | first step of every drain |
 | Enqueued job | picked up by the local worker | `runner.enqueue` + `dispatch.kick()` after commit (§17.4) | picked up by the same drain |

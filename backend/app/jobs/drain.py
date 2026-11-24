@@ -76,6 +76,7 @@ def _resume_if_stopped(row) -> bool:
 
 
 def _run_next(lanes: tuple[str, ...]) -> int | None:
+    db.sync()  # replica reads are local: pull jobs queued on the site since the last pick
     for lane in lanes:
         run_id = runner.run_one(lane)
         if run_id is not None:

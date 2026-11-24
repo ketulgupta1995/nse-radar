@@ -146,14 +146,30 @@ def _has_bars(symbol: str, source: str, conn: sqlite3.Connection) -> bool:
     return conn.execute(q, (source, symbol)).fetchone() is not None
 
 
-def _insert(conn: sqlite3.Connection, symbol: str, d: str, kind: str, primary: str | None,
-            other: str | None, detail: dict) -> int:  # fmt: skip
-    cur = conn.execute(
-        "INSERT OR IGNORE INTO price_checks(symbol, date, kind, primary_source, other_source, detail, "
-        "created_at) VALUES (?,?,?,?,?,?,?)",
-        (symbol, d, kind, primary, other, json.dumps(detail), timeutil.now_iso()),
-    )
-    return cur.rowcount
+def _insert(conn: sqlite3.Connection, symbol: str, found: list[tuple], window: int | None,
+            prim_close: pd.Series) -> int:  # fmt: skip
+    """Store the new checks and close the resolved ones; returns the number of new check rows.
+
+    Every read comes before every write, so on the cloud replica the reads stay local and the writes go
+    out in one batch at COMMIT (docs/CLOUD_SPIKE.md, "First drain").
+    """
+    existing = {
+        (r["date"], r["kind"])
+        for r in conn.execute("SELECT date, kind FROM price_checks WHERE symbol=?", (symbol,))
+    }
+    fresh: dict[tuple[str, str], tuple] = {}
+    for d, kind, primary, other, detail in found:
+        if (d, kind) not in existing:
+            row = (symbol, d, kind, primary, other, json.dumps(detail), timeutil.now_iso())
+            fresh.setdefault((d, kind), row)
+    _close_resolved(conn, symbol, prim_close, {(f[0], f[1]) for f in found}, window)
+    if fresh:
+        conn.executemany(
+            "INSERT OR IGNORE INTO price_checks(symbol, date, kind, primary_source, other_source, detail, "
+            "created_at) VALUES (?,?,?,?,?,?,?)",
+            list(fresh.values()),
+        )
+    return len(fresh)
 
 
 def check_symbol(symbol: str, conn: sqlite3.Connection, window: int | None = WINDOW) -> int:
@@ -163,15 +179,13 @@ def check_symbol(symbol: str, conn: sqlite3.Connection, window: int | None = WIN
     if primary is None:
         return 0
     prim_close = _adjusted_close(symbol, primary, conn)
-    new = 0
-    found: set[tuple[str, str]] = set()
+    found: list[tuple] = []  # (date, kind, primary, other, detail)
     others = [n for n in ordered if n != primary and _has_bars(symbol, n, conn)]
     if others:
         other = others[0]
         for m in find_mismatches(prim_close, _adjusted_close(symbol, other, conn), window):
             detail = {k: m[k] for k in ("ratio", "suggested_factor", "end", "ex_date")}
-            new += _insert(conn, symbol, m["date"], "mismatch", primary, other, detail)
-            found.add((m["date"], "mismatch"))
+            found.append((m["date"], "mismatch", primary, other, detail))
     action_dates = [
         r["ex_date"]
         for r in conn.execute(
@@ -180,19 +194,15 @@ def check_symbol(symbol: str, conn: sqlite3.Connection, window: int | None = WIN
         )
     ]
     for g in find_gaps(prim_close, action_dates, window):
-        detail = {"change_pct": g["change_pct"]}
-        new += _insert(conn, symbol, g["date"], "unexplained_gap", primary, None, detail)
-        found.add((g["date"], "unexplained_gap"))
+        found.append((g["date"], "unexplained_gap", primary, None, {"change_pct": g["change_pct"]}))
     spec = sources.spec(primary, "bars")
     if spec is not None and spec.adjusted is False:
         factors = adjust.adjustment_factors(symbol, conn)
         adj = adjust.apply_factors(adjust.load_raw(symbol, primary, conn), factors)
         for j in find_adjustment_jumps(adj, factors, window):
             keys = ("applied_factor", "open_move_pct", "close_move_pct", "suggested_factor")
-            new += _insert(conn, symbol, j["date"], "adjustment_jump", primary, None, {k: j[k] for k in keys})
-            found.add((j["date"], "adjustment_jump"))
-    _close_resolved(conn, symbol, prim_close, found, window)
-    return new
+            found.append((j["date"], "adjustment_jump", primary, None, {k: j[k] for k in keys}))
+    return _insert(conn, symbol, found, window, prim_close)
 
 
 def _close_resolved(conn: sqlite3.Connection, symbol: str, prim_close: pd.Series,

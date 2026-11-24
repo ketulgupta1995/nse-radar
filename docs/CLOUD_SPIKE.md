@@ -44,3 +44,28 @@ Run 45408652532 (2026-11-24): runner 4 CPUs, 16.4 GB RAM, 93 GB free disk, Pytho
 - Driver: **libsql**, remote on Vercel, embedded replica in Actions, behind the N002 wrapper (row objects, error mapping, batched `executemany`).
 - DB region: **aws-us-east-1** (group `us`).
 - Sources: **every source answers the honest User-Agent from GitHub Actions.** No fallback needed.
+
+## First drain (N020, 2026-11-24) and the lazy-transaction fix (2026-11-25)
+
+The first real drain (run 45415461408, Turso freshly seeded) took **104 min** and hit its time budget. That covered 7 of 15 jobs: the bhavcopy catch-up (11 days in 12 min), the index, announcements, news, events and event factors (22 min with no network items). `price_checks` reached 184 of 500 symbols in 64 min and then failed with `interactive transaction was rolled back because the stream was idle for too long`.
+
+Why: on the embedded replica, every write, `BEGIN`, `COMMIT` and every read *inside* an open transaction goes to the primary, and each connection also sent `PRAGMA foreign_keys=ON` to the primary. `db.tx()` always opened `BEGIN IMMEDIATE`, so every read the jobs did (whole price histories in `price_checks`, settings in `get_setting`, the once-a-second stop check) was a network read. That was slow, it used Turso's monthly read quota, and it kept a remote transaction open while pandas worked, which caused the idle timeout.
+
+Measured from the laptop against the spike DB (India to aws-us-east-1, so about 10× a runner's latency):
+
+| Step | Cost |
+|---|---|
+| new replica connection | 2 ms |
+| `PRAGMA foreign_keys=ON` on it | ~1.9 s (remote) |
+| read outside a transaction | < 1 ms (local) |
+| `BEGIN IMMEDIATE` + read + `COMMIT` | ~2.2 s |
+| one `executescript` with `BEGIN; …; COMMIT` | one round trip (~0.9 s), even with 2,000 statements (~3.9 s) |
+| `sync()` with nothing new | ~0.3 s |
+
+Behaviour found on the way (libsql 0.1.11, replica):
+- Turso enforces foreign keys and `ON DELETE CASCADE` **without** the PRAGMA.
+- `executescript` **does not raise** when a statement fails. It stops, the primary rolls the batch back, and the connection's `in_transaction` stays `True`. The old batched `executemany` path could therefore drop writes silently.
+
+Fix (`app/dbdriver.py`, `db.tx()`): no PRAGMA per connection, and on the replica `db.tx()` is a lazy transaction. Reads run on the local file, writes are held, and COMMIT sends them as one checked `BEGIN IMMEDIATE; …; COMMIT` batch. If `in_transaction` is still set afterwards, the batch is replayed statement by statement to raise the real error. A transaction that needs `rowcount` / `lastrowid` or reads after writing goes remote and runs as before. Because reads are local, the drain calls `sync()` before picking each job, and a running job syncs every 15 s to see stop requests from the site. `price_checks` now does all its reads before its writes.
+
+Same laptop measurements after the fix: a read-only transaction takes 7 ms instead of ~4 s, and 1 read + 8 writes takes 2.3 s instead of ~12 s.

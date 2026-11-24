@@ -5,6 +5,7 @@ from typing import Literal
 from app import db, timeutil
 
 MAX_MSG = 4000
+SYNC_EVERY_S = 15.0  # replica: how often a running job pulls the primary's writes to see a stop request
 
 
 class StopRequested(Exception):
@@ -55,6 +56,7 @@ class JobContext:
         t = time.monotonic()
         if self._last_check is None or t - self._last_check >= 1.0:
             self._last_check = t
+            db.sync_if_due(SYNC_EVERY_S)  # replica: a stop asked for on the site arrives through a sync
             with db.tx() as c:
                 row = c.execute("SELECT stop_requested FROM job_runs WHERE id=?", (self.run_id,)).fetchone()
             self._stop = bool(row and row["stop_requested"])
