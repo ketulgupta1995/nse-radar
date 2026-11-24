@@ -1707,7 +1707,7 @@ Tests run in `local` mode on SQLite, as today. Nothing in tests touches Turso, G
 
 **Dispatch from Vercel (N005):** `dispatch.kick(reason: str) -> bool` POSTs `https://api.github.com/repos/{GITHUB_REPO}/actions/workflows/drain.yml/dispatches` with `{"ref": "main", "inputs": {"reason": reason}}` and `Authorization: Bearer $GITHUB_DISPATCH_TOKEN` (a fine-grained token: this repo only, Actions read/write). It is called through `db.after_commit` from `runner.enqueue` when `RUNTIME == "vercel"`. It is debounced with settings key `last_dispatch_at`: no new dispatch within 60 s of the last one, because the waiting drain will pick up every queued job anyway. Failures are logged and return False. The job stays queued and the next dispatch or schedule runs it. The UI shows queued jobs as "waiting for the cloud worker (usually 1–2 min to start)".
 
-**Keep-alive:** GitHub disables scheduled workflows after 60 days without repo activity. On any `/api/jobs/status` call, at most once every 7 days (settings key `last_keepalive_at`), Vercel calls `PUT /repos/{GITHUB_REPO}/actions/workflows/daily.yml/enable`, which is harmless when the workflow is already enabled.
+**Keep-alive:** GitHub disables scheduled workflows after 60 days without repo activity. (1) Every `daily.yml` run first calls `gh workflow enable daily.yml` with the job's `GITHUB_TOKEN` (`permissions: actions: write`), the same approach as the common keep-alive actions. (2) Belt and braces: on any `/api/cloud/status` call, at most once every 7 days (settings key `last_keepalive_at`), Vercel calls `PUT /repos/{GITHUB_REPO}/actions/workflows/daily.yml/enable`, which is harmless when the workflow is already enabled.
 
 ### §17.5 Vercel app and the password gate
 
