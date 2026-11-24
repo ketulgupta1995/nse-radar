@@ -94,6 +94,10 @@ openssl rand -base64 32
 2. On your phone, open the Vercel address and log in with `APP_PASSWORD`. Add it to the home screen if you like.
 3. From now on the `daily` workflow runs by itself every weekday evening (18:45 IST) and every morning (08:00 IST).
 
+### What the workflows do
+
+The repo has three workflows under **Actions**. `ci` runs the backend tests and lint and the frontend build and tests on every push and pull request; it uses no secrets. `drain` is the cloud worker: it restores its local copy of the database from the Actions cache, runs every waiting job, then saves the copy again; only one drain runs at a time and at most one more waits, and its log shows counts only. The website starts a drain whenever you queue a job. `daily` runs at 18:45 IST on weekdays and 08:00 IST every day; it keeps the schedule switched on (GitHub turns off schedules after 60 quiet days) and then calls `drain` with "tick" on, so every job that's due gets queued first. To run a drain by hand: **Actions → drain → Run workflow**, optionally type a reason and tick **Enqueue every due schedule first**, then click **Run workflow**.
+
 ## 7. Opening a backup
 
 Every week the cloud worker saves an encrypted copy of the database as a GitHub artifact, kept for 90 days.

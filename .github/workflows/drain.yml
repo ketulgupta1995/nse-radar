@@ -1,0 +1,68 @@
+# The cloud worker (SPEC §17.3, §17.4): runs every queued job, then exits.
+# Started by hand, by Vercel (dispatch.kick) or by daily.yml. Output is counts only (§17.8).
+name: drain
+run-name: drain (${{ inputs.reason || 'manual' }})
+on:
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: Why this drain runs (shown in the run name)
+        type: string
+        default: manual
+      tick:
+        description: Enqueue every due schedule first
+        type: boolean
+        default: false
+  workflow_call:
+    inputs:
+      reason:
+        type: string
+        default: manual
+      tick:
+        type: boolean
+        default: false
+concurrency:
+  group: drain
+  cancel-in-progress: false
+permissions:
+  contents: read
+jobs:
+  drain:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: backend/pyproject.toml
+      - run: pip install -e backend
+      - run: mkdir -p data/cache
+      - name: Restore the replica and price store
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            data/replica.db
+            data/cache/price_store.pkl
+          key: replica-${{ github.run_id }}
+          restore-keys: replica-
+      - name: Drain the job queue
+        working-directory: backend
+        env:
+          STOCK_RUNTIME: actions
+          STOCK_DATA_DIR: ${{ github.workspace }}/data
+          STOCK_REPLICA_PATH: ${{ github.workspace }}/data/replica.db
+          TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
+          TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
+          DRAIN_TICK: ${{ inputs.tick && '--tick' || '' }}
+        run: python -m app.jobs.drain --lane all $DRAIN_TICK
+      - name: Save the replica and price store
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            data/replica.db
+            data/cache/price_store.pkl
+          key: replica-${{ github.run_id }}
+      # N011 adds the encrypted backup upload here.
