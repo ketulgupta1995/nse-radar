@@ -51,6 +51,13 @@ class Row(tuple):
         return list(self._cols)
 
 
+def _col_name(name: str) -> str:
+    """Turso's SQL parser uppercases keyword column names in DDL it runs (`key` -> `KEY`, also `rows`,
+    `explain`, `trigger`), so a table created through Turso reports them in capitals (N002 real-Turso
+    check, 2026-11-24). The code never uses all-caps names, so give them back in lower case."""
+    return name.lower() if name.isupper() else name
+
+
 def _map_error(e: Exception) -> sqlite3.Error:
     msg = str(e)
     if "SQLITE_CONSTRAINT" in msg or "constraint failed" in msg.lower():
@@ -72,6 +79,8 @@ class Cursor:
         self._raw = raw
         self._rowcount = rowcount
         desc = getattr(raw, "description", None) if raw is not None else None
+        if desc:
+            desc = tuple((_col_name(d[0]), *d[1:]) for d in desc)
         self.description = desc
         self._cols: tuple[str, ...] = tuple(d[0] for d in desc) if desc else ()
         self._index = {c.lower(): i for i, c in reversed(list(enumerate(self._cols)))}

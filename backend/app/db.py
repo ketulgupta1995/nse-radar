@@ -178,8 +178,40 @@ def sync() -> None:
 def schema_status() -> str:
     """Returns "ok", or "update pending" when the DB's user_version is behind SCHEMA_VERSION (§17.2)."""
     with read() as conn:
-        version = conn.execute("PRAGMA user_version").fetchone()[0]
+        version = schema_version(conn)
     return "ok" if version >= SCHEMA_VERSION else "update pending"
+
+
+def schema_version(conn: sqlite3.Connection) -> int:
+    """The DB's schema version: the higher of `PRAGMA user_version` and the `schema_meta` row.
+
+    Turso refuses `PRAGMA user_version=N` (N002 check against real Turso, 2026-11-24), so the version is
+    also kept in a one-row table. A file imported into Turso still carries its user_version.
+    """
+    version = conn.execute("PRAGMA user_version").fetchone()[0]
+    if conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='schema_meta'").fetchone():
+        row = conn.execute("SELECT version FROM schema_meta WHERE id=1").fetchone()
+        if row and row[0] > version:
+            version = row[0]
+    return version
+
+
+def _set_schema_version(conn: sqlite3.Connection, version: int) -> None:
+    """Locally `user_version` is the version. Only when Turso refuses the PRAGMA, use `schema_meta`."""
+    try:
+        conn.execute(f"PRAGMA user_version={version}")
+        return
+    except sqlite3.OperationalError:  # Turso: "SQL not allowed statement"
+        pass
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS schema_meta("
+        "id INTEGER PRIMARY KEY CHECK (id = 1), version INTEGER NOT NULL)"
+    )
+    conn.execute(
+        "INSERT INTO schema_meta(id, version) VALUES (1, ?) "
+        "ON CONFLICT(id) DO UPDATE SET version=excluded.version",
+        (version,),
+    )
 
 
 def init_db() -> None:
@@ -189,7 +221,7 @@ def init_db() -> None:
         d.mkdir(parents=True, exist_ok=True)
     conn = connect()
     try:
-        version = conn.execute("PRAGMA user_version").fetchone()[0]
+        version = schema_version(conn)
         if version < SCHEMA_VERSION:
             has_actions = conn.execute(
                 "SELECT 1 FROM sqlite_master WHERE type='table' AND name='corp_actions'"
@@ -197,7 +229,7 @@ def init_db() -> None:
             if has_actions:
                 _migrate(conn, version)
             conn.executescript(SCHEMA_PATH.read_text())  # idempotent DDL; runs outside tx()
-            conn.execute(f"PRAGMA user_version={SCHEMA_VERSION}")
+            _set_schema_version(conn, SCHEMA_VERSION)
     finally:
         conn.close()
     with tx() as conn:

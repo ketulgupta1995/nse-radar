@@ -257,3 +257,19 @@ def test_health_reports_runtime_and_schema(client):
     body = client.get("/api/health").json()
     assert body["runtime"] == "local"
     assert body["schema"] == "ok"
+
+
+def test_all_caps_column_names_come_back_lower_case():
+    """Turso uppercases keyword columns (key, rows, trigger, explain) in DDL it ran itself."""
+    from app import dbdriver
+
+    class Raw:
+        description = (("KEY", None), ("value", None), ("ROWS", None), ("sym_id", None))
+
+        def fetchone(self):
+            return ("k", "v", 3, 7)
+
+    row = dbdriver.Cursor(Raw()).fetchone()
+    assert row.keys() == ["key", "value", "rows", "sym_id"]
+    assert dict(zip(row.keys(), row, strict=True))["key"] == "k"
+    assert row["KEY"] == row["key"] == "k"

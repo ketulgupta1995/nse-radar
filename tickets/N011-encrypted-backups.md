@@ -14,3 +14,4 @@ SPEC §17.8, §6 (`backup` row), §5 (backup settings), `backend/app/jobs/defs/b
 - Tests: the backup job in actions mode (tmp DB standing in for the replica, `db.sync` patched): the weekly skip, the file name, gzip validity, and that settings keys are seeded.
 
 ## Notes for the planner
+- (Opus, after N002) `backup._verify` reads `PRAGMA user_version` of the copy; use `db.schema_version(conn)` instead (a Turso-made DB keeps its version in `schema_meta`, §17.11).

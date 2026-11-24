@@ -1769,3 +1769,5 @@ New dependency: `libsql` (Python, the Turso driver). Nothing else unless a ticke
 - libsql rows are tuples and its errors are `ValueError`s: `db.connect()` in Turso mode returns the N002 wrapper, never a raw libsql connection.
 - `executemany` is batched by the wrapper. Job code that writes in a per-row loop is slow remotely (~20 ms+ per statement even in-region); when a drain shows a slow job, batch its writes with `executemany`.
 - Turso's free plan also caps **embedded syncs at 3 GB/month**, so keep the replica in the Actions cache.
+- Turso refuses `PRAGMA user_version=N`. The schema version is `db.schema_version(conn)`: `user_version`, or the one-row `schema_meta` table when the PRAGMA was refused. Never read `PRAGMA user_version` directly in new code.
+- DDL run through Turso gets keyword column names uppercased (`key`, `rows`, `explain`, `trigger` → `KEY`…). The wrapper lowercases all-caps column names in results. Never use an all-caps column alias.

@@ -287,3 +287,24 @@ def test_version_11_db_moves_to_paise_and_symbol_ids_exactly():
     assert tuple(kinds) == ("integer", "integer", "integer", "integer")
     assert not idx
     assert store.last_bar_date("yfinance", "AAA", db.connect()) == "2010-01-04"
+
+
+def test_schema_version_falls_back_to_schema_meta_when_pragma_refused():
+    """Turso refuses `PRAGMA user_version=N`; the version then lives in schema_meta."""
+    import sqlite3
+
+    class Refusing:
+        def __init__(self):
+            self.c = sqlite3.connect(":memory:", isolation_level=None)
+
+        def execute(self, sql, params=()):
+            if sql.startswith("PRAGMA user_version="):
+                raise sqlite3.OperationalError("SQL not allowed statement: " + sql)
+            return self.c.execute(sql, params)
+
+    conn = Refusing()
+    assert db.schema_version(conn) == 0
+    db._set_schema_version(conn, db.SCHEMA_VERSION)
+    assert db.schema_version(conn) == db.SCHEMA_VERSION
+    db._set_schema_version(conn, db.SCHEMA_VERSION + 1)
+    assert db.schema_version(conn) == db.SCHEMA_VERSION + 1
