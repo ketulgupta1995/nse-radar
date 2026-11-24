@@ -125,4 +125,5 @@ Every week the cloud worker saves an encrypted copy of the database as a GitHub 
 
 - **Never commit `.env.local`** (or any `.env*` file other than `.env.example`) or anything in `data/`. `git status` should never list them.
 - **Everything in the repo and in the Actions logs and artifacts is public.** Secrets belong only in GitHub secrets, Vercel environment variables and `.env.local`. Don't paste a token, password, or your positions or journal into an issue, a commit message or a workflow file.
+- **Data-source keys you type into Settings on Vercel** are stored in the `source_secrets` table in Turso (Vercel's disk is read-only). That database is private to you, and the API never shows the values back.
 - If a secret leaks: make a new one (Turso: `turso db tokens invalidate nse-radar`, then create a new token; GitHub: delete the token and generate another), update it everywhere, and redeploy.
