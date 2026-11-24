@@ -53,6 +53,7 @@ def clean_copy(conn: sqlite3.Connection) -> None:
     conn.execute("BEGIN IMMEDIATE")
     for table in HISTORY_TABLES:
         conn.execute(f"DELETE FROM {table}")
+    conn.execute("UPDATE job_schedules SET last_run_id=NULL")  # pointed at the cleared laptop runs
     conn.execute("DELETE FROM alerts WHERE kind LIKE 'backup%'")
     conn.execute("DELETE FROM settings WHERE key LIKE 'backup%'")  # laptop-only; defaults apply
     for key, value in CLOUD_SETTINGS.items():
