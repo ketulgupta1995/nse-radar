@@ -22,7 +22,7 @@ SCRIPT_CHUNK = 1000  # statements per executescript batch
 
 _INSERT_RE = re.compile(
     r"^\s*(INSERT\s+(?:OR\s+(?:IGNORE|REPLACE)\s+)?INTO\s+[\w\".]+\s*\([^()]*\)\s*VALUES)\s*"
-    r"(\([^()'\"]*\))\s*;?\s*$",
+    r"(\([^()'\"]*\))\s*(ON\s+CONFLICT\b[^?;]*?)?\s*;?\s*$",  # an upsert tail without params is fine
     re.IGNORECASE | re.DOTALL,
 )
 
@@ -208,17 +208,17 @@ class TursoConnection:
             return Cursor(rowcount=total)
         m = _INSERT_RE.match(sql)
         if m and m.group(2).count("?") == len(rows[0]):
-            return self._insert_many(m.group(1), m.group(2), rows)
+            return self._insert_many(m.group(1), m.group(2), rows, m.group(3) or "")
         return self._script_many(sql, rows)
 
-    def _insert_many(self, head: str, values: str, rows: list[tuple]) -> Cursor:
+    def _insert_many(self, head: str, values: str, rows: list[tuple], tail: str = "") -> Cursor:
         per = max(1, MAX_PARAMS // max(1, len(rows[0])))
         total = 0
         for start in range(0, len(rows), per):
             chunk = rows[start : start + per]
             if any(len(r) != len(rows[0]) for r in chunk):
                 raise sqlite3.ProgrammingError("rows have different numbers of parameters")
-            sql = f"{head} {','.join([values] * len(chunk))}"
+            sql = f"{head} {','.join([values] * len(chunk))}" + (f" {tail.strip()}" if tail else "")
             cur = self.execute(sql, [v for r in chunk for v in r])
             total += max(cur.rowcount, 0)
         return Cursor(rowcount=total)

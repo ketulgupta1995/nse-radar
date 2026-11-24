@@ -172,8 +172,16 @@ def test_executemany_other_statements_run_as_one_script(tconn, fake_libsql):
 def test_executemany_upsert_and_empty(tconn, fake_libsql):
     assert tconn.executemany("INSERT INTO t(Name) VALUES (?)", []).rowcount == 0
     sql = "INSERT INTO t(Name, v) VALUES (?, ?) ON CONFLICT(Name) DO UPDATE SET v=excluded.v"
+    fake_libsql.log.clear()
     tconn.executemany(sql, [("a", 1), ("a", 2)])
+    assert [e[0] for e in fake_libsql.log] == ["execute"]  # one multi-row upsert, not a script
     assert tconn.execute("SELECT v FROM t WHERE Name='a'").fetchone()["v"] == 2
+    where = sql + " WHERE excluded.v >= t.v"
+    tconn.executemany(where, [("a", 1), ("b", 5)])  # a keeps 2 (1 < 2); b inserted
+    assert {r["Name"]: r["v"] for r in tconn.execute("SELECT Name, v FROM t")} == {"a": 2, "b": 5}
+    fake_libsql.log.clear()
+    tconn.executemany(sql.replace("excluded.v", "v + ?"), [("a", 1, 3)])  # tail with a param -> script
+    assert [e[0] for e in fake_libsql.log] == ["executescript"]
 
 
 def test_inline_params_skips_quotes_and_comments():
