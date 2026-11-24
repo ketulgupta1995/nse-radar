@@ -1,6 +1,7 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import { setPhone } from "./phone";
 
 import { api } from "../api/client";
 import Stock from "../pages/Stock";
@@ -60,4 +61,22 @@ test("right-hand tabs switch content", async () => {
   fireEvent.mouseDown(screen.getByRole("tab", { name: "Ask Claude" }), { button: 0, ctrlKey: false });
   expect(await screen.findByRole("tab", { name: "Ask Claude", selected: true })).toBeTruthy();
   expect(screen.getByLabelText("Ask Claude", { selector: "section" })).toBeTruthy();
+});
+
+describe("on a phone", () => {
+  beforeEach(() => act(() => setPhone(true)));
+  afterEach(() => act(() => setPhone(false)));
+
+  test("tabs render and switch, actions are icon buttons", async () => {
+    page();
+    await screen.findByText("TCS");
+    for (const n of ["Overview", "Quarterly", "News", "AI"]) expect(screen.getByRole("tab", { name: n })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: "Overview", selected: true })).toBeTruthy();
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Quarterly" }), { button: 0, ctrlKey: false });
+    expect(await screen.findByRole("tab", { name: "Quarterly", selected: true })).toBeTruthy();
+    expect(screen.getByLabelText("Quarterly results", { selector: "section" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Start checklist" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Ask Claude" }));
+    expect(await screen.findByRole("tab", { name: "AI", selected: true })).toBeTruthy();
+  });
 });

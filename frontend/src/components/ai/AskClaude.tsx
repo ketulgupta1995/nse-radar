@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { ApiError, api } from "../../api/client";
 import type { AiCreated } from "../../api/types";
+import { Button } from "@/components/ui/button";
+import { useIsPhone } from "@/lib/useIsPhone";
 import Markdown from "./Markdown";
 import PasteAnswerDialog from "./PasteAnswerDialog";
 
@@ -37,6 +39,7 @@ export default function AskClaude({ kind, symbol, payload, label, onDone }: Prop
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [pending, setPending] = useState<{ id: number; prompt: string } | null>(null);
+  const phone = useIsPhone();
   const doneRef = useRef(onDone);
   doneRef.current = onDone;
 
@@ -122,11 +125,18 @@ export default function AskClaude({ kind, symbol, payload, label, onDone }: Prop
 
   return (
     <div className="ask-claude">
-      <div className="card-head">
-        <button type="button" disabled={busy || unavailable} onClick={() => void start()}>{label}</button>
-        <button type="button" onClick={() => void copyPrompt()}>Copy prompt</button>
-      </div>
-      {unavailable && (
+      {phone && unavailable ? (
+        <div className="flex flex-col gap-2">
+          <Button className="h-10 w-full" onClick={() => void copyPrompt()}>Copy prompt</Button>
+          <p className="muted">Claude Code can't run on this device. Copy the prompt and paste it into claude.ai.</p>
+        </div>
+      ) : (
+        <div className="card-head">
+          <button type="button" disabled={busy || unavailable} onClick={() => void start()}>{label}</button>
+          <button type="button" onClick={() => void copyPrompt()}>Copy prompt</button>
+        </div>
+      )}
+      {unavailable && !phone && (
         <p className="muted">
           Claude isn't set up yet. Install Claude Code and log in: <code>npm i -g @anthropic-ai/claude-code</code>, then
           run <code>claude</code> once. You can still copy the prompt.

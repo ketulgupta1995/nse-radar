@@ -1,5 +1,6 @@
 import type { Fundamentals, QuarterRow, TableData } from "../../api/types";
 import Num from "../Num";
+import { useIsPhone } from "@/lib/useIsPhone";
 import { sourceTag } from "./FundamentalsPanel";
 
 export interface QRow {
@@ -86,6 +87,9 @@ interface Props {
 }
 
 export default function QuarterlyTable({ fundamentals, labels }: Props) {
+  const phone = useIsPhone();
+  // phone: the first column stays put while the numbers scroll sideways
+  const first = phone ? "sticky left-0 z-10 bg-card" : "";
   const built = fundamentals ? buildQuarterRows(fundamentals) : { rows: [], from: "" };
   return (
     <section className="rounded-card border border-border bg-card p-4" aria-label="Quarterly results">
@@ -94,11 +98,11 @@ export default function QuarterlyTable({ fundamentals, labels }: Props) {
         <p className="muted">No quarterly results yet.</p>
       ) : (
         <>
-          <div className="table-wrap">
+          <div className="table-wrap" data-testid="quarterly-scroll">
             <table className="data">
               <thead>
                 <tr>
-                  <th>Quarter ended</th>
+                  <th className={first}>Quarter ended</th>
                   <th>Sales</th>
                   <th>Profit</th>
                   <th>Earnings per share</th>
@@ -109,7 +113,7 @@ export default function QuarterlyTable({ fundamentals, labels }: Props) {
               <tbody>
                 {built.rows.map((r) => (
                   <tr key={r.period}>
-                    <td>{r.period}</td>
+                    <td className={first}>{r.period}</td>
                     <td><Num value={r.revenue} kind="cr" /></td>
                     <td><Num value={r.profit} kind="cr" /></td>
                     <td><Num value={r.eps} kind="inr" digits={2} /></td>

@@ -10,6 +10,7 @@ import { useEffect, useRef, useState } from "react";
 import type { IndicatorDef, PriceSeries } from "../../api/types";
 import { Button } from "@/components/ui/button";
 import { chartColors, useThemeVersion } from "@/lib/chartTheme";
+import { useIsPhone } from "@/lib/useIsPhone";
 import { chipLabel } from "./IndicatorPicker";
 
 const PALETTE = ["#e6a23c", "#7b61ff", "#16a085", "#d6336c", "#2a9df4", "#8d6e63"];
@@ -59,6 +60,7 @@ export default function PriceChart({ data, active, catalogue }: Props) {
   const rangeRef = useRef(range);
   const [legend, setLegend] = useState<Legend | null>(null);
   const theme = useThemeVersion();
+  const phone = useIsPhone();
 
   const applyRange = (chart: IChartApi, key: string) => {
     const days = TIMEFRAMES.find(([k]) => k === key)?.[1] ?? null;
@@ -83,7 +85,10 @@ export default function PriceChart({ data, active, catalogue }: Props) {
     const pos = c.up;
     const neg = c.down;
 
-    const chart: IChartApi = createChart(main, { ...opts, height: 380, width: main.clientWidth });
+    // phone: height is max(220px, 60% of the width); lightweight-charts' own touch pan/zoom stays on
+    const mainH = () => (phone ? Math.max(220, Math.round(main.clientWidth * 0.6)) : 380);
+    const subH = phone ? 100 : 140;
+    const chart: IChartApi = createChart(main, { ...opts, height: mainH(), width: main.clientWidth });
     const candles = chart.addSeries(CandlestickSeries, {
       upColor: pos, downColor: neg, borderVisible: false, wickUpColor: pos, wickDownColor: neg,
     });
@@ -99,7 +104,7 @@ export default function PriceChart({ data, active, catalogue }: Props) {
       return def?.pane === "separate" && (data.indicators[spec]?.length ?? 0) > 0;
     });
     sub.style.display = hasSub ? "block" : "none"; // before createChart, so it gets the real width
-    const subChart: IChartApi = createChart(sub, { ...opts, height: 140, width: sub.clientWidth });
+    const subChart: IChartApi = createChart(sub, { ...opts, height: subH, width: sub.clientWidth });
     // blank points on every bar date keep both panes' bar positions identical
     subChart
       .addSeries(LineSeries, { lastValueVisible: false, priceLineVisible: false })
@@ -170,7 +175,7 @@ export default function PriceChart({ data, active, catalogue }: Props) {
     applyRange(chart, rangeRef.current);
 
     const ro = new ResizeObserver(() => {
-      chart.applyOptions({ width: main.clientWidth });
+      chart.applyOptions({ width: main.clientWidth, height: mainH() }); // also fires on rotation
       subChart.applyOptions({ width: sub.clientWidth });
     });
     ro.observe(main);
@@ -182,7 +187,7 @@ export default function PriceChart({ data, active, catalogue }: Props) {
       subChart.remove();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, active, catalogue, theme]);
+  }, [data, active, catalogue, theme, phone]);
 
   const pickRange = (key: string) => {
     setRange(key);
@@ -211,7 +216,7 @@ export default function PriceChart({ data, active, catalogue }: Props) {
           </div>
         )}
       </div>
-      <div ref={mainRef} />
+      <div ref={mainRef} data-testid="chart-main" style={phone ? { height: "max(220px, 60vw)" } : undefined} />
       <div ref={subRef} style={{ display: "none" }} />
       {actions.length > 0 && (
         <p className="muted">

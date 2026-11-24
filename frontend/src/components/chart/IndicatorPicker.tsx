@@ -4,7 +4,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Select } from "@/components/ui/select";
+import { useIsPhone } from "@/lib/useIsPhone";
 
 export const DEFAULT_INDICATORS = ["sma:50", "sma:200", "rsi:14"];
 const KEY = "chart.indicators";
@@ -41,6 +43,7 @@ interface Props {
 }
 
 export default function IndicatorPicker({ catalogue, value, onChange }: Props) {
+  const phone = useIsPhone();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [vals, setVals] = useState<number[]>([]);
@@ -57,6 +60,32 @@ export default function IndicatorPicker({ catalogue, value, onChange }: Props) {
     setOpen(false);
     setName("");
   };
+
+  const panel = (
+    <>
+      <Select aria-label="Indicator" value={name} onChange={(e) => pick(e.target.value)}>
+        <option value="">Choose an indicator…</option>
+        {catalogue.map((c) => (
+          <option key={c.name} value={c.name}>{c.label}</option>
+        ))}
+      </Select>
+      {def && (
+        <>
+          <p className="muted">{def.explain_default}</p>
+          {def.params.map((p, i) => (
+            <label key={p.name} className="flex items-center justify-between gap-2">
+              <span>{p.label}</span>
+              <Input className="w-24"
+                type="number" min={p.min} max={p.max} value={vals[i] ?? p.default}
+                onChange={(e) => setVals(vals.map((v, j) => (j === i ? Number(e.target.value) : v)))}
+              />
+            </label>
+          ))}
+          <Button onClick={add}>Add to chart</Button>
+        </>
+      )}
+    </>
+  );
 
   return (
     <div className="relative mb-2 flex flex-wrap items-center gap-1.5">
@@ -76,30 +105,21 @@ export default function IndicatorPicker({ catalogue, value, onChange }: Props) {
       <Button variant="outline" size="sm" onClick={() => setOpen((o) => !o)}>
         + add
       </Button>
-      {open && (
+      {open && !phone && (
         <Card className="absolute left-0 top-9 z-20 flex w-[300px] flex-col gap-2 p-3 shadow-lg">
-          <Select aria-label="Indicator" value={name} onChange={(e) => pick(e.target.value)}>
-            <option value="">Choose an indicator…</option>
-            {catalogue.map((c) => (
-              <option key={c.name} value={c.name}>{c.label}</option>
-            ))}
-          </Select>
-          {def && (
-            <>
-              <p className="muted">{def.explain_default}</p>
-              {def.params.map((p, i) => (
-                <label key={p.name} className="flex items-center justify-between gap-2">
-                  <span>{p.label}</span>
-                  <Input className="w-24"
-                    type="number" min={p.min} max={p.max} value={vals[i] ?? p.default}
-                    onChange={(e) => setVals(vals.map((v, j) => (j === i ? Number(e.target.value) : v)))}
-                  />
-                </label>
-              ))}
-              <Button onClick={add}>Add to chart</Button>
-            </>
-          )}
+          {panel}
         </Card>
+      )}
+      {phone && (
+        <Dialog open={open} onOpenChange={setOpen}>
+          <DialogContent
+            aria-describedby={undefined}
+            className="bottom-0 left-0 top-auto flex max-h-[85vh] w-full translate-x-0 flex-col gap-2 overflow-y-auto rounded-b-none border-x-0 border-b-0 p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]"
+          >
+            <DialogTitle className="text-base font-semibold">Add an indicator</DialogTitle>
+            {panel}
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );

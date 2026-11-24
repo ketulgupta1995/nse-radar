@@ -4,7 +4,6 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import type { PriceSeries } from "../api/types";
 import PriceChart, { rangeFrom } from "../components/chart/PriceChart";
 import { chartColors } from "../lib/chartTheme";
-
 // A stand-in for lightweight-charts: records calls so the toolbar and legend can be checked without a canvas.
 const h = vi.hoisted(() => ({
   setVisibleRange: vi.fn(),

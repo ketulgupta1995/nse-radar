@@ -29,7 +29,7 @@ Status values: `todo` · `done` · `blocked` (add a reason).
 | N012 | Phone shell: top bar, bottom tabs, More sheet, search | — | sonnet | done |
 | N013 | DataTable shows rows as cards on a phone | N012 | sonnet | done |
 | N014 | Dashboard, Alerts and Watchlist on a phone | N013 | sonnet | done |
-| N015 | Stock page on a phone | N013 | sonnet | todo |
+| N015 | Stock page on a phone | N013 | sonnet | done |
 | N016 | Screener and rule builder on a phone | N013 | sonnet | todo |
 | N017 | Portfolio, Journal and Track record on a phone | N013 | sonnet | todo |
 | N018 | Backtests on a phone | N013, N005 | sonnet | todo |
