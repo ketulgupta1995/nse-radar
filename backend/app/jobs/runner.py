@@ -44,6 +44,46 @@ def enqueue(
         return int(cur.lastrowid)
 
 
+_ACTIVE_SQL = "SELECT id, job, params FROM job_runs WHERE status IN ('queued','running') ORDER BY id"
+
+
+def _active(c) -> dict[tuple[str, str], int]:
+    """(job, params JSON) -> oldest queued or running run id."""
+    out: dict[tuple[str, str], int] = {}
+    for r in c.execute(_ACTIVE_SQL):
+        out.setdefault((r["job"], r["params"]), r["id"])
+    return out
+
+
+def enqueue_many(items: list[dict]) -> list[int]:
+    """Enqueue several jobs in one transaction and one dispatch (SPEC §17.5).
+
+    Each item is `{"job": name, "params": dict | None, "trigger": str}` (params and trigger optional,
+    as in `enqueue`). Returns one run id per item, in order; a job already queued or running with the
+    same params keeps its run, as in `enqueue`. A fixed number of statements, whatever the count.
+    """
+    keys = [(it["job"], _params_json(it.get("params"))) for it in items]
+    if not keys:
+        return []
+    with db.tx() as c:
+        active = _active(c)
+        new: dict[tuple[str, str], str] = {}
+        for it, key in zip(items, keys, strict=True):
+            if key not in active and key not in new:
+                new[key] = it.get("trigger", "manual")
+        if new:
+            now = timeutil.now_iso()
+            c.execute(
+                "INSERT INTO job_runs(job, params, trigger, status, queued_at) VALUES "
+                + ",".join(["(?,?,?,'queued',?)"] * len(new)),
+                [v for (job, pj), trig in new.items() for v in (job, pj, trig, now)],
+            )
+            active = _active(c)
+            if config.RUNTIME == "vercel":  # one dispatch for the whole batch (SPEC §17.4)
+                db.after_commit(lambda: dispatch.kick(f"enqueue {len(new)} jobs"))
+        return [active[k] for k in keys]
+
+
 def request_stop(run_id: int) -> None:
     with db.tx() as c:
         cur = c.execute(

@@ -261,6 +261,51 @@ def unregister_custom(name: str) -> None:
         pass
 
 
+CLOUD_ONLY = "'{name}' is a custom indicator: it is worked out in the cloud worker, not on this page."
+
+
+def register_metadata(row: dict) -> None:
+    """Register an approved row's name, params and explain only (Vercel, SPEC §17.2, N021).
+
+    Rules that name it pass validation and describe correctly; computing it raises ValueError,
+    because custom code never runs on Vercel (screens and backtests that use it are jobs).
+    """
+    name = row["name"]
+    if validate_name(name) is not None:
+        raise ValueError(f"cannot register '{name}'")
+    params = validate_params_schema(row["params_schema"])
+
+    def fn(frame: pd.DataFrame, bench: pd.Series | None, **kw) -> pd.Series:
+        raise ValueError(CLOUD_ONLY.format(name=name))
+
+    indicators.unregister(name)
+    indicators.register(
+        IndicatorDef(name, _label(name), row["explain"], tuple(params), fn, "separate", custom=True)
+    )
+
+
+def load_approved_metadata() -> int:
+    """Vercel: register every approved indicator without its code (never selected). Returns the count."""
+    import json
+
+    with db.read() as conn:
+        rows = [
+            dict(r)
+            for r in conn.execute(
+                "SELECT name, params_schema, explain FROM custom_indicators WHERE status='approved'"
+            )
+        ]
+    loaded = 0
+    for row in rows:
+        try:
+            row["params_schema"] = json.loads(row["params_schema"])
+            register_metadata(row)
+            loaded += 1
+        except Exception:
+            log.exception("could not load custom indicator %s", row.get("name"))
+    return loaded
+
+
 def load_approved() -> int:
     """Register every approved row (re-checked statically). Returns how many were loaded."""
     import json

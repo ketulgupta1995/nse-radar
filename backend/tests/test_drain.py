@@ -122,3 +122,24 @@ def test_summary_is_counts_only(caplog):
     assert "jobs=1" in line and "done=1" in line and "items_ok=1" in line
     for private in ("PRIVATE-PARAM", "PRIVATE-MESSAGE", "PRIVATE-LOG-LINE", "dr_secret"):
         assert private not in line
+
+
+def test_seeded_db_gets_bar_counts_once(monkeypatch):
+    """N021: a seeded cloud DB has no bars_coverage; the drain runs housekeeping once to make it."""
+    import importlib
+
+    from app import bardb
+    from app.jobs.defs import housekeeping
+
+    if "housekeeping" not in registry._JOBS:  # an earlier test's cleanup may have dropped it
+        importlib.reload(housekeeping)
+    monkeypatch.setattr(drain, "_setup_logging", lambda: None)  # keep the test's log levels
+    assert drain.main([]) == 0  # local mode: nothing extra
+    assert runs("housekeeping") == []
+    monkeypatch.setattr(config, "RUNTIME", "actions")
+    assert drain.main([]) == 0
+    r = runs("housekeeping")
+    assert len(r) == 1 and r[0]["status"] == "done" and r[0]["trigger"] == "system"
+    assert "rows" in db.get_setting(bardb.COVERAGE_KEY)
+    assert drain.main([]) == 0
+    assert len(runs("housekeeping")) == 1  # the snapshot exists now: not queued again

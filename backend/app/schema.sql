@@ -182,3 +182,7 @@ CREATE TABLE IF NOT EXISTS symbol_changes (          -- ticker renames (T077); s
   source TEXT NOT NULL, old_symbol TEXT NOT NULL, new_symbol TEXT NOT NULL, effective_date TEXT NOT NULL,
   name TEXT, note TEXT, PRIMARY KEY (source, old_symbol, new_symbol, effective_date)) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS symbol_changes_new ON symbol_changes(new_symbol);
+
+CREATE TABLE IF NOT EXISTS source_secrets (          -- credentials in vercel/actions mode (N021, SPEC §3.6);
+  source TEXT, key TEXT, value TEXT,                 -- locally they stay in data/secrets.json
+  PRIMARY KEY (source, key));

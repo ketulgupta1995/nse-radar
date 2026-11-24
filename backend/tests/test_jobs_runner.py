@@ -151,3 +151,27 @@ def test_duplicate_registration_and_log_truncation():
     runner.run_one()
     with db.tx() as c:
         assert len(c.execute("SELECT msg FROM job_logs WHERE run_id=?", (rid,)).fetchone()[0]) == 4000
+
+
+def test_enqueue_many_one_tx_one_kick(monkeypatch):
+    from app import config
+    from app.cloud import dispatch
+
+    kicks: list[str] = []
+    monkeypatch.setattr(dispatch, "kick", lambda reason: kicks.append(reason) or True)
+    monkeypatch.setattr(config, "RUNTIME", "vercel")
+    old = runner.enqueue("noop", params={"n": 1})
+    kicks.clear()
+    ids = runner.enqueue_many([
+        {"job": "noop", "params": {"n": 1}},  # already queued: same run
+        {"job": "noop", "params": {"n": 2}, "trigger": "system"},
+        {"job": "noop", "params": {"n": 2}},  # repeated in the batch: same new run
+        {"job": "noop"},
+    ])  # fmt: skip
+    assert ids[0] == old and ids[1] == ids[2] and len(set(ids)) == 3
+    assert run_row(ids[1])["trigger"] == "system" and run_row(ids[3])["trigger"] == "manual"
+    assert run_row(ids[3])["params"] == "{}" and run_row(ids[1])["status"] == "queued"
+    assert len(kicks) == 1
+    assert runner.enqueue_many([{"job": "noop", "params": {"n": 1}}]) == [old]
+    assert len(kicks) == 1  # nothing new: no dispatch
+    assert runner.enqueue_many([]) == []

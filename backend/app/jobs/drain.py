@@ -12,7 +12,7 @@ import logging
 import threading
 import time
 
-from app import bootstrap, config, db, timeutil
+from app import bardb, bootstrap, config, db, timeutil
 from app.jobs import runner, scheduler
 
 log = logging.getLogger("app.jobs.drain")  # explicit: under `python -m` __name__ is "__main__"
@@ -91,6 +91,20 @@ def _startup(tick: bool) -> None:
     runner.recover_on_startup()
     if tick:
         scheduler.tick(timeutil.now())
+    _ensure_bar_counts()
+
+
+def _ensure_bar_counts() -> None:
+    """A freshly seeded cloud DB has no `bars_coverage` snapshot (the seed file is made offline, so it
+    enqueues nothing): queue `housekeeping` once so the Sources page on Vercel shows row counts (N021)."""
+    if config.RUNTIME != "actions":
+        return
+    try:
+        db.get_setting(bardb.COVERAGE_KEY)
+        return
+    except KeyError:
+        pass
+    runner.enqueue("housekeeping", trigger="system")
 
 
 def _drain(lanes: tuple[str, ...], expired: threading.Event, counts: dict[str, int]) -> None:

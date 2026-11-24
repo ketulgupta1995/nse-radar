@@ -2,6 +2,7 @@ import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { ApiError, api } from "../../api/client";
 import type { ScreenPreview, ScreenPreviewStart } from "../../api/types";
 import { runOkItems, runWaitText, waitForRun } from "../../lib/runs";
+import { loadRuntime } from "../../lib/useRuntime";
 import type { Rule } from "../../lib/rules";
 import type { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
@@ -48,7 +49,8 @@ export default function ScreenEditor({ initial, onSave, onCancel, aboveBuilder, 
     setPreview(null);
     try {
       const { run_id } = await api.post<ScreenPreviewStart>("/screens/preview", { rule: draft.rule });
-      const run = await waitForRun(run_id, (r) => setWaiting(runWaitText(r)), () => !alive.current);
+      const rt = await loadRuntime(); // cached after the first answer
+      const run = await waitForRun(run_id, (r) => setWaiting(runWaitText(r, rt)), () => !alive.current);
       if (!run) return;
       if (run.status !== "done") throw new Error(run.message ?? `The preview was ${run.status}.`);
       const items = await runOkItems(run_id);

@@ -1,13 +1,14 @@
 import { api } from "../api/client";
-import type { RunItem, RunSummary } from "../api/types";
+import type { RunItem, RunSummary, Runtime } from "../api/types";
 
 /** How often a page asks about a job it started (SPEC §17.5: heavy work runs as a job). */
 export const RUN_POLL_MS = 2000;
 
 export const runFinished = (r: RunSummary): boolean => r.status !== "queued" && r.status !== "running";
 
-/** Plain words for a run that hasn't finished yet. */
-export function runWaitText(r: RunSummary | null): string {
+/** Plain words for a run that hasn't finished yet. Only on Vercel does a job wait for the cloud worker. */
+export function runWaitText(r: RunSummary | null, runtime: Runtime | null): string {
+  if (runtime !== "vercel") return "Running…";
   if (r?.status === "running") return "Running in the cloud worker…";
   return "Waiting for the cloud worker (usually 1–2 min to start)…";
 }

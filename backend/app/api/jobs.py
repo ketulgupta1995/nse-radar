@@ -155,10 +155,27 @@ def pause(body: Annotated[dict[str, Any], Body()]) -> dict:
 @router.post("/jobs/refresh")
 def refresh() -> dict:
     jobs = [j for j in registry.all_jobs() if j.refresh]
-    with db.tx() as c:  # one transaction for the on/off checks, not one per job (SPEC §17.5)
-        enabled = {g: _source_enabled(g, c) for g in {j.group for j in jobs}}
-    on = [j for j in jobs if enabled[j.group] is not False]
-    return {"run_ids": [runner.enqueue(j.name, trigger="manual") for j in on]}
+    off = _disabled_sources(jobs)
+    on = [j for j in jobs if _source_of(j.group) not in off]
+    # one transaction and one dispatch for the whole batch (SPEC §17.5, N021)
+    return {"run_ids": runner.enqueue_many([{"job": j.name, "trigger": "manual"} for j in on])}
+
+
+def _source_of(group: str) -> str | None:
+    return group.split(":", 1)[1] if group.startswith("source:") else None
+
+
+def _disabled_sources(jobs: list) -> set[str]:
+    """Switched-off sources among these jobs' groups, in one query (SPEC §17.5)."""
+    try:
+        from app.sources import registry as src
+    except ImportError:
+        return set()
+    known = {s.name for s in src.all_sources()}
+    names = sorted({n for j in jobs if (n := _source_of(j.group)) in known})
+    with db.tx() as c:
+        enabled = src._enabled_map(names, c)
+    return {n for n, on in enabled.items() if not on}
 
 
 def _last_trading_date() -> str | None:

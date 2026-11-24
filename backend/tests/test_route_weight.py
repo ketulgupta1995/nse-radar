@@ -291,3 +291,18 @@ def test_closes_match_frames(heavy_world, client):
         assert got[sym] == pytest.approx(want) if want is not None else got[sym] is None, sym
     assert got["S03"] == pytest.approx(frames.load_frame("S03")[: DAYS[-100]]["close"].iloc[-1])
     assert frames.latest_closes(["s01"])["S01"] == pytest.approx(frames.load_frame("S01")["close"].iloc[-1])
+
+
+REFRESH_BUDGET = 15  # N021: one transaction and one dispatch for the whole batch
+
+
+def test_refresh_enqueues_in_few_statements(heavy_world, client, monkeypatch):
+    from app.cloud import dispatch
+
+    kicks: list[str] = []
+    monkeypatch.setattr(dispatch, "kick", lambda reason: kicks.append(reason) or True)
+    Counting.count = 0
+    r = client.post("/api/jobs/refresh")
+    assert r.status_code == 200 and len(r.json()["run_ids"]) >= 5
+    assert Counting.count <= REFRESH_BUDGET, f"{Counting.count} statements"
+    assert len(kicks) == 1  # one dispatch, not one per job

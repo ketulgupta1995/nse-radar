@@ -7,9 +7,11 @@ import ScreenList, { ranText } from "../components/screens/ScreenList";
 import ScreenResults, { newSymbols, sortResults } from "../components/screens/ScreenResults";
 import Screener from "../pages/Screener";
 import { RUN_POLL_MS } from "../lib/runs";
+import { resetRuntime } from "../lib/useRuntime";
 
 afterEach(() => {
   cleanup();
+  resetRuntime();
   vi.unstubAllGlobals();
   vi.useRealTimers();
 });
@@ -100,6 +102,7 @@ function installApi(a: Api) {
     const method = init?.method ?? "GET";
     a.calls.push(`${method} ${url}`);
     const ok = (body: unknown) => new Response(JSON.stringify(body), { status: 200 });
+    if (url === "/api/health") return ok({ ok: true, time: "x", version: "x", runtime: "vercel" });
     if (url === "/api/screens" && method === "GET") return ok(a.screens);
     if (url === "/api/screens" && method === "POST") {
       const b = JSON.parse(String(init?.body));
@@ -230,6 +233,7 @@ test("editor preview runs as a job, then shows the count and at most the first 5
   const calls: string[] = [];
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
     calls.push(`${init?.method ?? "GET"} ${url}`);
+    if (url === "/api/health") return new Response(JSON.stringify({ ok: true, runtime: "vercel" }), { status: 200 });
     if (url === "/api/screens/preview") return new Response(JSON.stringify({ run_id: 9 }), { status: 200 });
     if (url === "/api/jobs/runs/9") return new Response(JSON.stringify(polls.shift()), { status: 200 });
     if (url.startsWith("/api/jobs/runs/9/items")) return new Response(JSON.stringify(items), { status: 200 });

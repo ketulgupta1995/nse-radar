@@ -195,3 +195,31 @@ def test_reject_and_delete(client):
         indicators.get("my_avg")
     assert client.delete(f"/api/custom-indicators/{cid}").status_code == 200
     assert client.get("/api/custom-indicators").json() == []
+
+
+def test_vercel_loads_metadata_never_code(client, monkeypatch):
+    """N021: on Vercel a rule naming an approved indicator validates and describes; nothing runs."""
+    from app import bootstrap, config
+    from app.analytics import rules
+
+    with db.tx() as c:
+        c.execute(
+            "INSERT INTO custom_indicators(name, params_schema, explain, code, status, created_at) "
+            "VALUES ('my_avg', ?, 'Average of the last {n} closes', 'not python', 'approved', 'x'), "
+            "('pending_one', ?, 'p', 'x', 'pending', 'x')",
+            (json.dumps(SCHEMA), json.dumps(SCHEMA)),
+        )
+    monkeypatch.setattr(config, "RUNTIME", "vercel")
+    monkeypatch.setattr(ci, "_build_compute", lambda code: pytest.fail("custom code built on Vercel"))
+    bootstrap.load_plugins()
+    d = indicators.get("my_avg")
+    assert d.custom and [p.name for p in d.params] == ["n"]
+    assert d.explain == "Average of the last {n} closes"
+    with pytest.raises(ValueError):
+        indicators.get("pending_one")
+    raw = {"all": [{"left": {"ind": "my_avg", "params": {"n": 10}}, "op": ">", "right": {"value": 1}}]}
+    assert rules.describe(rules.validate_rule(raw))
+    r = client.post("/api/rules/describe", json=raw)
+    assert r.status_code == 200, r.text
+    with pytest.raises(ValueError, match="cloud worker"):
+        indicators.compute("my_avg", pd.DataFrame({"close": [1.0, 2.0, 3.0]}), None, n=2)

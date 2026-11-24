@@ -1,6 +1,8 @@
-"""Credential store: data/secrets.json, mode 0600 (SPEC §3.6).
+"""Credential store (SPEC §3.6, N021).
 
-Values are never logged, returned by an API, put in prompts or stored in SQLite.
+Locally: data/secrets.json, mode 0600. In the cloud (`vercel`, `actions`) the function's file system is
+read-only and the runner's is thrown away, so values live in the `source_secrets` table in Turso, which
+is private. Values are never logged, returned by an API or put in prompts.
 """
 
 import json
@@ -8,9 +10,16 @@ import os
 import tempfile
 import threading
 
-from app import config
+from app import config, db
 
 _lock = threading.Lock()
+
+
+def _in_db() -> bool:
+    return config.RUNTIME in ("vercel", "actions")
+
+
+# ---- local: the JSON file ------------------------------------------------------------------
 
 
 def _load() -> dict[str, dict[str, str]]:
@@ -36,12 +45,7 @@ def _save(data: dict[str, dict[str, str]]) -> None:
         raise
 
 
-def get(source: str, key: str) -> str | None:
-    value = _load().get(source, {}).get(key)
-    return value or None
-
-
-def set(source: str, key: str, value: str | None) -> None:  # noqa: A001
+def _file_set(source: str, key: str, value: str | None) -> None:
     with _lock:
         data = _load()
         if value is None:
@@ -53,11 +57,51 @@ def set(source: str, key: str, value: str | None) -> None:  # noqa: A001
         _save(data)
 
 
+# ---- cloud: the source_secrets table -------------------------------------------------------
+
+
+def _db_source(source: str) -> dict[str, str]:
+    with db.read() as c:
+        rows = c.execute("SELECT key, value FROM source_secrets WHERE source=?", (source,)).fetchall()
+    return {r["key"]: r["value"] for r in rows}
+
+
+def _db_set(source: str, key: str, value: str | None) -> None:
+    with db.tx() as c:
+        if value is None:
+            c.execute("DELETE FROM source_secrets WHERE source=? AND key=?", (source, key))
+        else:
+            c.execute(
+                "INSERT INTO source_secrets(source, key, value) VALUES (?,?,?) "
+                "ON CONFLICT(source, key) DO UPDATE SET value=excluded.value",
+                (source, key, value),
+            )
+
+
+# ---- public API ----------------------------------------------------------------------------
+
+
+def _stored(source: str) -> dict[str, str]:
+    return _db_source(source) if _in_db() else _load().get(source, {})
+
+
+def get(source: str, key: str) -> str | None:
+    value = _stored(source).get(key)
+    return value or None
+
+
+def set(source: str, key: str, value: str | None) -> None:  # noqa: A001
+    if _in_db():
+        _db_set(source, key, value)
+    else:
+        _file_set(source, key, value)
+
+
 def status(source: str) -> dict[str, bool]:
     """Key -> is set. Includes the keys the registered source declares, never any value."""
     from app.sources import registry
 
-    stored = _load().get(source, {})
+    stored = _stored(source)
     try:
         declared = registry.get(source).secrets
     except KeyError:

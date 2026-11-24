@@ -5,9 +5,11 @@ import { ApiError, api } from "../api/client";
 import type { CustomIndicator, RunSummary } from "../api/types";
 import CustomIndicatorReview from "../components/screens/CustomIndicatorReview";
 import { RUN_POLL_MS } from "../lib/runs";
+import { resetRuntime } from "../lib/useRuntime";
 
 afterEach(() => {
   cleanup();
+  resetRuntime();
   vi.restoreAllMocks();
 });
 
@@ -28,6 +30,7 @@ const run = (over: Partial<RunSummary>): RunSummary => ({
 function backend(runs: RunSummary[], status: CustomIndicator["status"]) {
   const post = vi.spyOn(api, "post").mockResolvedValue({ ...ind, run_id: 41 });
   const get = vi.spyOn(api, "get").mockImplementation(async (path: string) => {
+    if (path === "/health") return { ok: true, time: "x", version: "x", runtime: "vercel" };
     if (path === "/jobs/runs/41") return runs.length > 1 ? runs.shift() : runs[0];
     if (path === "/custom-indicators") return [{ ...ind, id: 3, name: "other" }, { ...ind, status }];
     throw new Error(`unexpected ${path}`);

@@ -22,10 +22,15 @@ export interface CustomIndicator {
   run_id?: number;
 }
 
+/** Where the backend runs (SPEC §17.2). */
+export type Runtime = "local" | "vercel" | "actions";
+
 export interface Health {
   ok: boolean;
   time: string;
   version: string;
+  runtime?: Runtime;
+  schema?: "ok" | "update pending";
 }
 
 export type ScheduleKind = "interval" | "daily" | "weekly" | "manual";

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { ApiError, api } from "../../api/client";
 import type { CustomIndicator } from "../../api/types";
 import { runWaitText, waitForRun } from "../../lib/runs";
+import { loadRuntime } from "../../lib/useRuntime";
 import Explain from "../Explain";
 import Modal from "../checklist/Modal";
 import { Button } from "@/components/ui/button";
@@ -39,7 +40,8 @@ export default function CustomIndicatorReview({ indicator, onClose, onApproved, 
     try {
       const started = await api.post<CustomIndicator>(`/custom-indicators/${current.id}/approve`);
       if (started.run_id === undefined) throw new Error("The approval did not start.");
-      const run = await waitForRun(started.run_id, (r) => setWaiting(runWaitText(r)), () => !alive.current);
+      const rt = await loadRuntime(); // cached after the first answer
+      const run = await waitForRun(started.run_id, (r) => setWaiting(runWaitText(r, rt)), () => !alive.current);
       if (!run) return;
       const all = await api.get<CustomIndicator[]>("/custom-indicators");
       const fresh = all.find((c) => c.id === current.id) ?? started;
