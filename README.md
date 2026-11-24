@@ -1,35 +1,27 @@
 # nse-radar
 
 
-> Cloud copy of stock-tools (Vercel + Turso + GitHub Actions). See `docs/SPEC.md` §17 and `tickets/README.md`. The setup guide (`docs/CLOUD_SETUP.md`) arrives with ticket N003; until N007 the rest of this README still describes the laptop app.
+> Cloud copy of stock-tools (Vercel + Turso + GitHub Actions). See `docs/SPEC.md` §17 and `tickets/README.md`. To put it online, follow **[docs/CLOUD_SETUP.md](docs/CLOUD_SETUP.md)**.
 
-A **local, single-user research app** for Indian stocks (NSE). It runs on your laptop under WSL2 and opens in the browser.
+A **single-user research app** for Indian stocks (NSE). It runs in the cloud and opens in any browser, including on your phone.
 
 **Purpose:** stay informed and get **data-backed, tested** stock ideas for holding periods of a few weeks to 3–4 months, using daily prices. There is no buying, no selling and no broker link.
 
 > **This is not financial advice.** It shows ideas to research and how a rule would have done on past prices. Past results do not guarantee future returns. Check the checklist and make your own decisions.
 
-## Setup
+## Local dev
 
-Needs Python 3.13, Node 22 and npm. Then, from this folder:
+Needs Python 3.13, Node 22 and npm. From this folder:
 
 ```bash
-./start.sh
+./start.sh --dev
 ```
 
-The first run creates the Python environment, installs the packages, builds the frontend and starts the app. Open **http://127.0.0.1:8600**.
+This runs the auto-reloading API plus the vite dev server against a local SQLite file (`data/stock.db`); Ctrl+C stops both. The first run creates the Python environment and installs the packages.
+
+The cloud deployment (Vercel for the app, Turso for the database, GitHub Actions for the background jobs) is set up once by following [docs/CLOUD_SETUP.md](docs/CLOUD_SETUP.md).
 
 ## Daily use
-
-| Command | What it does |
-|---|---|
-| `./start.sh` | runs the app in this terminal (Ctrl+C stops it) |
-| `./start.sh --background` | runs it detached; log in `data/logs/app.log`, pid in `data/app.pid`. Does nothing if it is already running |
-| `./start.sh --status` | says whether it is running, and the address |
-| `./start.sh --stop` | stops the background app |
-| `./start.sh --dev` | development mode: auto-reloading API plus the vite dev server; Ctrl+C stops both |
-
-You can change the port with `STOCK_PORT=8700 ./start.sh`. The app listens on all network interfaces (`0.0.0.0`) so other devices on your network can open it; use `STOCK_HOST=127.0.0.1 ./start.sh` to keep it on this laptop only.
 
 Open the **Dashboard** first. It shows what changed since you last looked, the alerts that need attention, today's ranked shortlist and your positions. **Refresh now** fetches the latest data. The line in the sidebar always shows how fresh the data is.
 
@@ -63,23 +55,6 @@ Jobs run in stages, in this order. Each can be paused, stopped or run on demand 
 - **Alerts**: checks your positions, stops, targets and announcements, in-app only.
 - **Housekeeping**: deletes old run history and seen alerts after 90 days.
 - **Ask Claude / Backtest**: run only when you click.
-
-## Auto-start (optional)
-
-To have the app start when you log in to Windows, run this yourself in **Windows PowerShell** (not WSL), from the project folder as seen from Windows (for example `\\wsl$\<distro>\home\<you>\ketul\claude_projects\stock-tools`):
-
-```powershell
-Set-ExecutionPolicy -Scope Process Bypass
-.\scripts\install-autostart.ps1
-```
-
-It registers a Scheduled Task for your user (no admin rights needed) that starts the app one minute after logon, in a hidden window. It picks the first WSL distro from `wsl.exe -l -q`; choose another with `-Distro Ubuntu`. Running it again replaces the task. Check it in **Task Scheduler** (`taskschd.msc`) under *Task Scheduler Library* → `StockToolsAutostart`.
-
-To remove it:
-
-```powershell
-.\scripts\uninstall-autostart.ps1
-```
 
 ## Backup and restore
 

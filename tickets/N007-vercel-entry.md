@@ -19,3 +19,7 @@ SPEC §17.2, §17.5, `backend/app/main.py`, `backend/app/plugins.py`, `backend/p
 - Report the installed size of the `requirements.txt` set (`pip install --target /tmp/x -r requirements.txt && du -sh /tmp/x`, using the scratch dir) in the notes. It must be well under 500 MB.
 
 ## Notes for the planner
+- **Install size:** `pip install --target` wasn't approved in the headless session, so I measured the same packages and their dependencies in `backend/.venv/site-packages` instead (fastapi, starlette, pydantic(+core), httpx stack, pandas, numpy, dateutil, tzdata, bs4, soupsieve, lxml, feedparser, sgmllib, libsql): **≈192 MB**, well under 500 MB. You can confirm it with `pip install --target <scratch> -r requirements.txt && du -sh <scratch>`.
+- `vercel.json` `ignoreCommand` uses `git diff --quiet HEAD^ HEAD -- . ':(exclude)…'`: exit 0 (only ignored paths changed) skips the deploy. If `HEAD^` is missing (shallow clone), git exits non-zero and the deploy runs anyway, which is the safe direction.
+- `installCommand` is not set: Vercel installs the root `requirements.txt` for the Python function by default.
+- README: the "first full load" section still talks about leaving the laptop running and keeping it awake, and "Backup and restore" / "AI features" still describe the laptop. These are out of scope here; they should be rewritten for the cloud (N010/N011/N020).

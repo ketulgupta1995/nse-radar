@@ -1,0 +1,11 @@
+# Python deps for the Vercel function (SPEC §17.5): §2.2 runtime deps + libsql, minus uvicorn and yfinance.
+# Pinned to the versions in backend/.venv.
+fastapi==0.165.0
+httpx==0.28.1
+pandas==3.1.1
+numpy==2.5.5
+pydantic==2.14.4
+beautifulsoup4==4.15.0
+lxml==6.1.3
+feedparser==6.0.14
+libsql==0.1.11

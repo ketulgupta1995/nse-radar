@@ -39,15 +39,22 @@ for _mod in import_all("app.api"):
         app.include_router(_router, prefix="/api")
 
 _dist = Path(config.ROOT) / "frontend" / "dist"
-if _dist.is_dir():
-    app.mount("/assets", StaticFiles(directory=_dist / "assets"), name="assets")
 
 
-@app.get("/{path:path}", include_in_schema=False)
-def spa(path: str):
-    if path == "api" or path.startswith("api/"):
-        return PlainTextResponse("Not found", status_code=404)
-    index = _dist / "index.html"
-    if index.is_file():
-        return FileResponse(index)
-    return PlainTextResponse("Frontend not built: run ./start.sh")
+def _mount_frontend(app: FastAPI) -> None:
+    """Serve the React build and the SPA fallback (local mode only; Vercel serves them itself, §17.5)."""
+    if _dist.is_dir():
+        app.mount("/assets", StaticFiles(directory=_dist / "assets"), name="assets")
+
+    @app.get("/{path:path}", include_in_schema=False)
+    def spa(path: str):
+        if path == "api" or path.startswith("api/"):
+            return PlainTextResponse("Not found", status_code=404)
+        index = _dist / "index.html"
+        if index.is_file():
+            return FileResponse(index)
+        return PlainTextResponse("Frontend not built: run ./start.sh")
+
+
+if config.RUNTIME != "vercel":
+    _mount_frontend(app)
