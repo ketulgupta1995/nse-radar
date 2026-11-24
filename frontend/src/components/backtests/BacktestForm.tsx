@@ -10,6 +10,7 @@ import Explain from "../Explain";
 import RuleBuilder from "../rules/RuleBuilder";
 import BatchOptions from "./BatchOptions";
 import ExitEditor from "./ExitEditor";
+import { useCloud } from "@/lib/cloud";
 import { toast } from "@/components/ui/toaster";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,6 +27,7 @@ const CUSTOM = "custom";
 const FALLBACK_HOLDOUT = "2022-01-01";
 
 export default function BacktestForm({ onStarted, onBatchStarted, onCancel }: Props) {
+  const { runtime } = useCloud();
   const [screens, setScreens] = useState<Screen[]>([]);
   const [defs, setDefs] = useState<ExitDefInfo[]>([]);
   const [entry, setEntry] = useState<string>(CUSTOM);
@@ -288,6 +290,11 @@ export default function BacktestForm({ onStarted, onBatchStarted, onCancel }: Pr
         <Button type="submit" disabled={busy || periodProblem !== null}>Run on training period</Button>{" "}
         <Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button>
       </p>
+      {runtime === "vercel" && (
+        <p className="text-muted-foreground">
+          Backtests run in the cloud worker. It starts in a minute or two, and you can leave this page.
+        </p>
+      )}
     </form>
   );
 }

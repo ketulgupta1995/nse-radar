@@ -29,7 +29,7 @@ export default function ExitEditor({ defs, value, onChange }: Props) {
       {value.map((e, i) => {
         const def = byType(e.type);
         return (
-          <div key={`${e.type}-${i}`} className="exit-row card">
+          <div key={`${e.type}-${i}`} className="exit-row card flex flex-col gap-2">
             <strong>{def?.label ?? e.type}</strong>
             {def && <Explain text={def.explain} />}{" "}
             <button type="button" onClick={() => onChange(value.filter((_, j) => j !== i))}>Remove</button>
@@ -38,6 +38,7 @@ export default function ExitEditor({ defs, value, onChange }: Props) {
                 {p.label}{" "}
                 <input
                   type="number"
+                  className="max-md:block max-md:h-10 max-md:w-full"
                   min={p.min}
                   max={p.max}
                   step={p.kind === "int" ? 1 : 0.1}

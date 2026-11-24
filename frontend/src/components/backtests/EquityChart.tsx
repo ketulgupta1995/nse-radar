@@ -2,6 +2,7 @@ import { LineSeries, createChart, createSeriesMarkers } from "lightweight-charts
 import type { SeriesMarker, Time } from "lightweight-charts";
 import { useEffect, useRef } from "react";
 import type { EquityPoint } from "../../api/types";
+import { useIsPhone } from "@/lib/useIsPhone";
 
 function css(name: string, fallback: string): string {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
@@ -18,8 +19,14 @@ interface Props {
   oosStart: string | null;
 }
 
+/** Laptop: 340 px. Phone (SPEC §17.9): 60% of the width, at least 220 px. */
+function chartHeight(width: number, phone: boolean): number {
+  return phone ? Math.max(220, Math.round(width * 0.6)) : 340;
+}
+
 export default function EquityChart({ points, oosStart }: Props) {
   const ref = useRef<HTMLDivElement>(null);
+  const phone = useIsPhone();
 
   useEffect(() => {
     const el = ref.current;
@@ -31,7 +38,7 @@ export default function EquityChart({ points, oosStart }: Props) {
       grid: { vertLines: { color: grid }, horzLines: { color: grid } },
       rightPriceScale: { borderColor: grid },
       timeScale: { borderColor: grid },
-      height: 340,
+      height: chartHeight(el.clientWidth, phone),
       width: el.clientWidth,
     });
     const strat = chart.addSeries(LineSeries, {
@@ -54,13 +61,13 @@ export default function EquityChart({ points, oosStart }: Props) {
       createSeriesMarkers(strat, [marker]);
     }
     chart.timeScale().fitContent();
-    const onResize = () => chart.applyOptions({ width: el.clientWidth });
+    const onResize = () => chart.applyOptions({ width: el.clientWidth, height: chartHeight(el.clientWidth, phone) });
     window.addEventListener("resize", onResize);
     return () => {
       window.removeEventListener("resize", onResize);
       chart.remove();
     };
-  }, [points, oosStart]);
+  }, [points, oosStart, phone]);
 
-  return <div ref={ref} className="equity-chart" aria-label="Account value over time, strategy against the Nifty 500" />;
+  return <div ref={ref} className="equity-chart w-full min-h-[220px] md:min-h-[340px]" aria-label="Account value over time, strategy against the Nifty 500" />;
 }

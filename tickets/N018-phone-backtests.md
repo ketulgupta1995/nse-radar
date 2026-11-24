@@ -20,3 +20,5 @@ The files above, `frontend/src/lib/cloud.ts` (new: `useCloud()` fetching `/api/c
 Phone: list cards, the detail metric grid, and the form shows the cloud line when the mocked `/api/cloud/status` says `runtime: "vercel"` and hides it for `local`. Existing tests pass. `npm run build && npm test` pass.
 
 ## Notes for the planner
+- `GET /api/backtests` (`_brief` in `backend/app/api/backtests.py`) only returns `cagr` and `excess`, so phone list cards show a blank "Worst fall" and "Trades" until `_brief` also returns `max_drawdown` and `trades` (the frontend already reads them when present).
+- `useCloud()` reads `runtime` from `/api/cloud/status`; the "Waiting for the cloud worker" line shows on queued runs only when it says `vercel`.

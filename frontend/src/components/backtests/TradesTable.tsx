@@ -9,7 +9,7 @@ export default function TradesTable({ trades }: { trades: BacktestTrade[] }) {
   const [sorting, setSorting] = useState<SortingState>([{ id: "exit_date", desc: true }]);
   const columns = useMemo<ColumnDef<BacktestTrade>[]>(
     () => [
-      { id: "symbol", header: "Stock", accessorFn: (t) => t.symbol, cell: ({ row }) => <Link to={`/stock/${row.original.symbol}`} className="font-mono">{row.original.symbol}</Link> },
+      { id: "symbol", header: "Stock", meta: { phone: "title" }, accessorFn: (t) => t.symbol, cell: ({ row }) => <Link to={`/stock/${row.original.symbol}`} className="font-mono">{row.original.symbol}</Link> },
       { id: "entry_date", header: "Bought", accessorFn: (t) => t.entry_date },
       { id: "entry", header: "Buy price", meta: { right: true }, accessorFn: (t) => t.entry, cell: ({ row }) => <Num value={row.original.entry} kind="inr" digits={2} /> },
       { id: "exit_date", header: "Sold", accessorFn: (t) => t.exit_date },
@@ -17,7 +17,7 @@ export default function TradesTable({ trades }: { trades: BacktestTrade[] }) {
       { id: "qty", header: "Shares", meta: { right: true }, accessorFn: (t) => t.qty, cell: ({ row }) => <Num value={row.original.qty} /> },
       { id: "pnl", header: "Profit (₹)", meta: { right: true }, accessorFn: (t) => t.pnl, cell: ({ row }) => <Num value={row.original.pnl} kind="inr" colored /> },
       { id: "pnl_pct", header: "Profit %", meta: { right: true }, accessorFn: (t) => t.pnl_pct, cell: ({ row }) => <Num value={row.original.pnl_pct} kind="pct" colored /> },
-      { id: "reason", header: "Why sold", accessorFn: (t) => t.reason },
+      { id: "reason", header: "Why sold", meta: { phone: "subtitle" }, accessorFn: (t) => t.reason },
       { id: "days", header: "Days held", meta: { right: true }, accessorFn: (t) => t.days, cell: ({ row }) => <Num value={row.original.days} /> },
     ],
     [],

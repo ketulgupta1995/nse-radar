@@ -1,6 +1,7 @@
 import type { MetricSet, Metrics } from "../../api/types";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { useIsPhone } from "@/lib/useIsPhone";
 import Explain from "../Explain";
 import Num from "../Num";
 
@@ -69,15 +70,18 @@ const FINAL_COLS: Col[] = [
 
 export default function MetricCards({ metrics, kind = "legacy" }: { metrics: Metrics; kind?: "explore" | "final" | "legacy" }) {
   const cols = (kind === "explore" ? EXPLORE_COLS : kind === "final" ? FINAL_COLS : LEGACY_COLS).filter((c) => metrics[c.key]);
+  const phone = useIsPhone();
   return (
-    <div className={cn("mb-4 grid gap-4", cols.length === 1 ? "max-w-xl grid-cols-1" : "grid-cols-3")}>
+    <div className={cn("mb-4 grid gap-4", phone || cols.length === 1 ? "grid-cols-1" : "grid-cols-3", !phone && cols.length === 1 && "max-w-xl")}>
       {cols.map((c) => (
         <Card key={c.key} data-metric-col={c.key} data-emphasis={c.key === "oos"} className={cn("min-w-0", c.key === "oos" && "border-accent")}>
           <h3>{c.title}</h3>
           {c.sub && <p className="muted">{c.sub}</p>}
-          <dl className="m-0">
+          <dl className={cn("m-0", phone && "grid grid-cols-2 gap-2")} data-testid={phone ? "metric-grid" : undefined}>
             {ROWS.map((r) => (
-              <div key={r.label} className="flex items-baseline justify-between gap-2 border-b border-border py-1.5 last:border-b-0">
+              <div key={r.label} className={cn(phone
+                ? "flex flex-col gap-0.5 rounded-card border border-border p-2"
+                : "flex items-baseline justify-between gap-2 border-b border-border py-1.5 last:border-b-0")}>
                 <dt>
                   {r.label}
                   <Explain text={r.explain} />

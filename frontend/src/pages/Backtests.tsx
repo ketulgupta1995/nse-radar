@@ -14,8 +14,11 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useCloud } from "@/lib/cloud";
+import { useIsPhone } from "@/lib/useIsPhone";
 import { toast } from "@/components/ui/toaster";
 
+const CLOUD_WAIT = "Waiting for the cloud worker (usually 1–2 min)";
 const POLL_MS = 1500;
 const msg = (e: unknown) => (e instanceof ApiError ? e.message : String(e));
 
@@ -32,16 +35,43 @@ function List({ onNew }: { onNew: () => void }) {
   useEffect(() => {
     api.get<BacktestListItem[]>("/backtests").then(setItems).catch((e) => setError(msg(e)));
   }, []);
+  const phone = useIsPhone();
+  const { runtime } = useCloud();
   const columns = useMemo<ColumnDef<BacktestListItem>[]>(
     () => [
-      { id: "name", header: "Name", accessorFn: (b) => b.name || `Backtest ${b.id}`, cell: ({ row }) => <Link to={`/backtests/${row.original.id}`}>{row.original.name || `Backtest ${row.original.id}`}</Link> },
-      { accessorKey: "status", header: "Status", cell: ({ row }) => <StatusChip status={row.original.status} /> },
+      { id: "name", header: "Name", meta: { phone: "title" }, accessorFn: (b) => b.name || `Backtest ${b.id}`, cell: ({ row }) => <Link to={`/backtests/${row.original.id}`}>{row.original.name || `Backtest ${row.original.id}`}</Link> },
+      {
+        accessorKey: "status", header: "Status",
+        cell: ({ row }) => {
+          const b = row.original;
+          if (phone && b.status === "done") return null; // a phone card only shows status while it matters
+          return (
+            <>
+              <StatusChip status={b.status} />
+              {b.status === "queued" && runtime === "vercel" && <span className="block text-muted-foreground">{CLOUD_WAIT}</span>}
+            </>
+          );
+        },
+      },
       { id: "created_at", header: "Started", accessorFn: (b) => b.created_at, cell: ({ row }) => row.original.created_at.slice(0, 16).replace("T", " ") },
-      { id: "kind", header: "Kind", accessorFn: (b) => KIND_LABEL[b.kind] ?? b.kind },
+      {
+        id: "kind", header: "Kind", meta: { phone: "subtitle" }, accessorFn: (b) => KIND_LABEL[b.kind] ?? b.kind,
+        cell: ({ row }) => {
+          const label = KIND_LABEL[row.original.kind] ?? row.original.kind;
+          return phone ? <Badge variant={row.original.kind === "final" ? "info" : "neutral"}>{label}</Badge> : label;
+        },
+      },
       { id: "cagr", header: "Yearly return", meta: { right: true }, sortUndefined: "last", accessorFn: (b) => shown(b)?.cagr ?? undefined, cell: ({ row }) => <><Num value={shown(row.original)?.cagr} kind="pct" colored />{suffix(row.original)}</> },
       { id: "excess", header: "Beat the index by", meta: { right: true }, sortUndefined: "last", accessorFn: (b) => shown(b)?.excess ?? undefined, cell: ({ row }) => <><Num value={shown(row.original)?.excess} kind="pct" colored />{suffix(row.original)}</> },
+      // phone cards also show the worst fall and the trade count (laptop columns stay as they were)
+      ...(phone
+        ? ([
+            { id: "max_drawdown", header: "Worst fall", sortUndefined: "last", accessorFn: (b) => shown(b)?.max_drawdown ?? undefined, cell: ({ row }) => <Num value={shown(row.original)?.max_drawdown} kind="pct" colored /> },
+            { id: "trades", header: "Trades", sortUndefined: "last", accessorFn: (b) => shown(b)?.trades ?? undefined, cell: ({ row }) => <Num value={shown(row.original)?.trades} /> },
+          ] satisfies ColumnDef<BacktestListItem>[])
+        : []),
     ],
-    [],
+    [phone, runtime],
   );
   return (
     <>

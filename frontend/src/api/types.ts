@@ -611,8 +611,8 @@ export interface BacktestListItem {
   kind: "explore" | "final" | "legacy";
   parent_id: number | null;
   metrics: {
-    is?: { cagr: number | null; excess: number | null } | null;
-    oos?: { cagr: number | null; excess: number | null } | null;
+    is?: { cagr: number | null; excess: number | null; max_drawdown?: number | null; trades?: number | null } | null;
+    oos?: { cagr: number | null; excess: number | null; max_drawdown?: number | null; trades?: number | null } | null;
   } | null;
 }
 
