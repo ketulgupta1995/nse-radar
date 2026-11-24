@@ -73,7 +73,7 @@ openssl rand -base64 32
 ## 5. Vercel: the website
 
 1. On vercel.com: **Add New → Project → Import** your `nse-radar` GitHub repo.
-2. Framework Preset: **Other**. Leave the build settings alone; `vercel.json` sets them.
+2. Leave the framework and build settings alone: `vercel.json` defines two services, `web` (the React site) and `api` (the Python backend under `/api`). If Vercel offers its own auto-detected services setup, keep the repo's `vercel.json`.
 3. Open **Environment Variables** and add:
 
    | Name | Value |

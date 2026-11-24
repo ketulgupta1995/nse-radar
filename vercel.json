@@ -1,17 +1,30 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "cd frontend && npm ci && npm run build",
-  "outputDirectory": "frontend/dist",
   "regions": ["iad1"],
-  "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/index" },
-    { "source": "/(.*)", "destination": "/index.html" }
-  ],
-  "functions": {
-    "api/index.py": {
-      "maxDuration": 60,
-      "excludeFiles": "{backend/tests/**,frontend/**,docs/**,tickets/**}"
+  "services": {
+    "web": {
+      "root": "frontend",
+      "framework": "vite",
+      "buildCommand": "npm ci && npm run build",
+      "outputDirectory": "dist",
+      "ignoreCommand": "git diff --quiet HEAD^ HEAD -- ':(top)frontend' ':(top)vercel.json' ':(top,exclude)**/*.md' ':(top,exclude)frontend/src/__tests__'",
+      "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+    },
+    "api": {
+      "root": ".",
+      "framework": "fastapi",
+      "entrypoint": "api.index:app",
+      "ignoreCommand": "git diff --quiet HEAD^ HEAD -- ':(top)api' ':(top)backend/app' ':(top)requirements.txt' ':(top)vercel.json' ':(top,exclude)**/*.md'",
+      "functions": {
+        "api/index.py": {
+          "maxDuration": 60,
+          "excludeFiles": "{backend/tests/**,frontend/**,docs/**,tickets/**,scripts/**,data/**,logs/**}"
+        }
+      }
     }
   },
-  "ignoreCommand": "git diff --quiet HEAD^ HEAD -- . ':(exclude)*.md' ':(exclude)**/*.md' ':(exclude)tickets/' ':(exclude)docs/' ':(exclude)backend/tests/' ':(exclude).github/'"
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": { "service": "api" } },
+    { "source": "/(.*)", "destination": { "service": "web" } }
+  ]
 }

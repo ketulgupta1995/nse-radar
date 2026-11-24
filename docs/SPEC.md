@@ -1710,12 +1710,12 @@ Tests run in `local` mode on SQLite, as today. Nothing in tests touches Turso, G
 
 ### §17.5 Vercel app and the password gate
 
-- `api/index.py` (repo root) puts `backend/` on `sys.path`, sets `STOCK_RUNTIME=vercel` if unset, and exposes `app` from `app.main`. `vercel.json`:
-  - `buildCommand`: `cd frontend && npm ci && npm run build`; `outputDirectory`: `frontend/dist`
-  - rewrites: `/api/(.*)` → `/api/index`; everything else → `/index.html` (SPA)
+- `api/index.py` (repo root) puts `backend/` on `sys.path`, sets `STOCK_RUNTIME=vercel` if unset, and exposes `app` from `app.main`. `vercel.json` uses Vercel **services** (2026-11-25):
+  - service `web`: root `frontend`, Vite, `npm ci && npm run build` → `dist`, its own rewrite of every path to `/index.html` (SPA)
+  - service `api`: root `.`, FastAPI, entrypoint `api.index:app`; `functions["api/index.py"]`: `maxDuration` 60, `excludeFiles` for `backend/tests/**`, `frontend/**`, `docs/**`, `tickets/**`, `scripts/**`, `data/**`, `logs/**`
+  - public rewrites: `/api/(.*)` → `api` (it receives the full `/api/...` path), everything else → `web`. No bindings: only the browser calls the API.
   - `regions`: `["iad1"]` (next to the Turso DB in aws-us-east-1, §17.11)
-  - `functions["api/index.py"]`: `maxDuration` 60, `excludeFiles` for `backend/tests/**`, `frontend/**`, `docs/**`, `tickets/**`
-  - `ignoreCommand`: skip deploys when only `*.md`, `tickets/`, `docs/`, `backend/tests/` or `.github/` changed (keeps Vercel usage low)
+  - per-service `ignoreCommand`: `web` builds only when `frontend/` (not its tests or `*.md`) or `vercel.json` changed; `api` only when `api/`, `backend/app/`, `requirements.txt` or `vercel.json` changed (keeps Vercel usage low)
 - Python deps for Vercel: root `requirements.txt`, the runtime deps of §2.2 plus `libsql`, minus `uvicorn` and `yfinance` (adapters whose library is missing are skipped, `plugins.import_all`). Vercel never fetches from data sources.
 - **Light routes only:** a Vercel request may make at most ~50 SQL statements and must never call `frames.load_frame` for more than a few symbols, `price_store`, or anything that loops over `bar_symbols`. Heavy work is a job (§17.3) whose results the UI reads. N009 audits every route against this rule and records the result in `docs/CLOUD_ROUTES.md`.
 - **Password gate (N008):** if env `APP_PASSWORD` is set, every `/api/*` path except `/api/health` and `/api/login` needs the cookie `nr_session` = `<expiry>.<hmac_sha256(APP_SECRET, expiry)>` (HttpOnly, Secure, SameSite=Lax, 90 days). `POST /api/login {"password"}` → 204 + cookie, or 401 after a constant-time compare. `POST /api/logout` clears it. Otherwise → 401 `{"detail": "login required"}`, and the frontend shows `/login`. With `APP_PASSWORD` unset (local dev) the gate is off.
