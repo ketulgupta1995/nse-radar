@@ -34,6 +34,8 @@ export interface AppRoute {
   /** Sidebar section and icon; required for entries with nav: true. */
   group?: NavGroup;
   icon?: LucideIcon;
+  /** Position (1–4) in the phone bottom tab bar; other nav routes go in "More". */
+  phoneTab?: number;
   element: JSX.Element;
 }
 
@@ -42,11 +44,11 @@ export const NAV_GROUPS: NavGroup[] = ["Research", "Money", "Validate", "System"
 
 // Add a page by adding one entry here. Nav order = array order.
 export const routes: AppRoute[] = [
-  { path: "/", label: "Dashboard", nav: true, group: "Research", icon: LayoutDashboard, element: <Dashboard /> },
-  { path: "/screener", label: "Screener", nav: true, group: "Research", icon: Filter, element: <Screener /> },
-  { path: "/watchlist", label: "Watchlist", nav: true, group: "Research", icon: Star, element: <Watchlist /> },
+  { path: "/", label: "Dashboard", nav: true, group: "Research", icon: LayoutDashboard, phoneTab: 1, element: <Dashboard /> },
+  { path: "/screener", label: "Screener", nav: true, group: "Research", icon: Filter, phoneTab: 2, element: <Screener /> },
+  { path: "/watchlist", label: "Watchlist", nav: true, group: "Research", icon: Star, phoneTab: 3, element: <Watchlist /> },
   { path: "/stock/:symbol", label: "Stock", nav: false, element: <Stock /> },
-  { path: "/positions", label: "Portfolio", nav: true, group: "Money", icon: Wallet, element: <Portfolio /> },
+  { path: "/positions", label: "Portfolio", nav: true, group: "Money", icon: Wallet, phoneTab: 4, element: <Portfolio /> },
   { path: "/journal", label: "Journal", nav: true, group: "Money", icon: BookOpen, element: <Journal /> },
   { path: "/backtests", label: "Backtests", nav: true, group: "Validate", icon: FlaskConical, element: <Backtests /> },
   { path: "/backtests/new", label: "New backtest", nav: false, element: <Backtests /> },

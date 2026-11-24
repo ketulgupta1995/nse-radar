@@ -36,7 +36,7 @@ You are implementing **one ticket** from `tickets/`. The plan was written in adv
 After two failed attempts at the same problem, stop. Write what you tried under "Notes for the planner" in the ticket and tell the user. Don't hack around it.
 
 ## UI conventions (frontend)
-- **Stack:** Tailwind 4 + shadcn-style components in `frontend/src/components/ui/` (Button, Card, Badge / StatusChip, Tabs, Tooltip, Skeleton, Input, Select, Progress, EmptyState, DataTable, Toaster). Icons from `lucide-react`. Laptop only (1280px and wider): no phone or tablet layouts.
+- **Stack:** Tailwind 4 + shadcn-style components in `frontend/src/components/ui/` (Button, Card, Badge / StatusChip, Tabs, Tooltip, Skeleton, Input, Select, Progress, EmptyState, DataTable, Toaster). Icons from `lucide-react`. Laptop (768 px+) layout unchanged; phones (<768 px) get phone layouts per SPEC §17.9. Use `useIsPhone()` and test both with `setPhone()`.
 - **Add a page:** one entry in `routes.tsx` with `group` (Research / Money / Validate / System) and a lucide `icon`. It appears in the sidebar and the Ctrl+K palette automatically.
 - **Lists are `DataTable`** (sorting, density toggle, sticky header, empty state, skeleton rows). Right-align numbers with `meta: { right: true }`. Put sections in `Card`. Show waiting with `Skeleton`, empty lists with `EmptyState`, and success with `toast.success(...)` from `components/ui/toaster`.
 - **Colours are tokens** in `src/index.css` (`bg-card`, `text-muted-foreground`, `border-border`, `text-accent`, `success` / `danger` / `warning` / `info`). `pos` / `neg` (green / red) are only for profit and loss or price direction, never for status or decoration. The chart reads the same tokens through `lib/chartTheme.ts`.

@@ -15,7 +15,12 @@ export function notifyStatusChanged(): void {
 
 const nice = (job: string) => job.replace(/_/g, " ");
 
-export default function StatusIndicator() {
+function Dot({ className }: { className: string }) {
+  return <span aria-hidden="true" className={`inline-block size-2 flex-none rounded-full ${className}`} />;
+}
+
+/** `compact`: a coloured dot plus short text, for the phone top bar. */
+export default function StatusIndicator({ compact = false }: { compact?: boolean }) {
   const [status, setStatus] = useState<JobsStatus | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -41,6 +46,27 @@ export default function StatusIndicator() {
     };
   }, [load]);
 
+  if (compact) {
+    const full = !status
+      ? "Checking data…"
+      : status.updating
+        ? `Updating${status.background.running ? `: ${nice(status.background.running.job)}` : ""}…`
+        : `Data as of ${formatDay(status.last_trading_date)}`;
+    const cls = "flex min-h-10 items-center gap-1.5 whitespace-nowrap text-xs no-underline";
+    if (status?.updating)
+      return (
+        <Link to="/jobs" className={`${cls} text-foreground`} title={full} aria-label={full}>
+          <Dot className="animate-pulse bg-warning" />
+          Updating
+        </Link>
+      );
+    return (
+      <div className={`${cls} text-muted-foreground`} title={full} aria-label={full}>
+        <Dot className={status ? "bg-success" : "bg-muted-foreground"} />
+        {status ? formatDay(status.last_trading_date) : "…"}
+      </div>
+    );
+  }
   if (!status) return <div className="status-indicator muted">Checking data…</div>;
   if (status.updating) {
     const run = status.background.running;

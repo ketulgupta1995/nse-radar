@@ -1,9 +1,10 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useParams } from "react-router-dom";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 
 import { api } from "../api/client";
 import Layout from "../components/Layout";
+import { setPhone } from "./phone";
 
 beforeEach(() => {
   localStorage.clear();
@@ -66,4 +67,59 @@ test("Ctrl+K opens the palette; typing a symbol and selecting it navigates", asy
   const item = await screen.findByText("Tata Consultancy Services");
   fireEvent.click(item);
   await waitFor(() => expect(screen.getByText("stock page TCS")).toBeTruthy());
+});
+
+test("laptop: sidebar present, no tab bar", () => {
+  setPhone(false);
+  renderShell();
+  expect(screen.getByRole("navigation", { name: "Main" })).toBeTruthy();
+  expect(screen.queryByRole("navigation", { name: "Tabs" })).toBeNull();
+});
+
+test("phone: no sidebar, four tabs plus More", () => {
+  setPhone(true);
+  renderShell();
+  expect(screen.queryByRole("navigation", { name: "Main" })).toBeNull();
+  const tabs = screen.getByRole("navigation", { name: "Tabs" });
+  const links = within(tabs).getAllByRole("link");
+  expect(links.map((l) => l.textContent)).toEqual(["Dashboard", "Screener", "Watchlist", "Portfolio"]);
+  expect(within(tabs).getAllByRole("button").map((b) => b.textContent)).toEqual(["More"]);
+  // home route "/" is a tab, so Dashboard is active and More is not
+  expect(links[0].getAttribute("aria-current")).toBe("page");
+  expect(within(tabs).getByRole("button", { name: "More" }).getAttribute("aria-current")).toBeNull();
+  expect(screen.getByRole("heading", { name: "Dashboard" })).toBeTruthy();
+});
+
+test("phone: More lists the other pages; tapping one navigates and closes the sheet", async () => {
+  setPhone(true);
+  renderShell();
+  fireEvent.click(screen.getByRole("button", { name: "More" }));
+  const sheet = await screen.findByRole("dialog");
+  for (const name of ["Alerts", "Backtests", "Jobs", "Sources", "Settings", "Journal", "Track record"])
+    expect(within(sheet).getByRole("link", { name })).toBeTruthy();
+  expect(within(sheet).queryByRole("link", { name: "Screener" })).toBeNull();
+  expect(within(sheet).getByRole("button", { name: /Theme/ })).toBeTruthy();
+  fireEvent.click(within(sheet).getByRole("link", { name: "Jobs" }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  expect(screen.getByRole("heading", { name: "Jobs" })).toBeTruthy();
+  const tabs = screen.getByRole("navigation", { name: "Tabs" });
+  expect(within(tabs).getByRole("button", { name: "More" }).getAttribute("aria-current")).toBe("page");
+});
+
+test("phone: the search button opens the palette", async () => {
+  setPhone(true);
+  renderShell();
+  fireEvent.click(screen.getByRole("button", { name: "Search stocks and pages" }));
+  const box = await screen.findByLabelText("Find a stock or page");
+  await waitFor(() => expect(document.activeElement).toBe(box));
+  expect(screen.getByRole("button", { name: "Close search" })).toBeTruthy();
+});
+
+test("switching to a phone width swaps the shell live", () => {
+  setPhone(false);
+  renderShell();
+  expect(screen.getByRole("navigation", { name: "Main" })).toBeTruthy();
+  act(() => setPhone(true));
+  expect(screen.queryByRole("navigation", { name: "Main" })).toBeNull();
+  expect(screen.getByRole("navigation", { name: "Tabs" })).toBeTruthy();
 });

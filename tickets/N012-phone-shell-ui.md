@@ -32,3 +32,5 @@ SPEC §17.9, §14 "Shared", AGENTS.md "UI conventions", `frontend/src/components
 
 
 ## Notes for the planner
+- `AlertBadge` isn't in this ticket's file list, so on a phone its "No new alerts" text is hidden with `[&_.badge-text]:hidden` on a wrapper in `Layout.tsx`. A `compact` prop on `AlertBadge` would be cleaner.
+- `useTheme()` keeps its own state each time it's called, so `Layout` passes `theme`/`onToggleTheme` to `MoreSheet` as props.
