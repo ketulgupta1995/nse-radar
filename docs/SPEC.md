@@ -1714,6 +1714,7 @@ Tests run in `local` mode on SQLite, as today. Nothing in tests touches Turso, G
 - `api/index.py` (repo root) puts `backend/` on `sys.path`, sets `STOCK_RUNTIME=vercel` if unset, and exposes `app` from `app.main`. `vercel.json`:
   - `buildCommand`: `cd frontend && npm ci && npm run build`; `outputDirectory`: `frontend/dist`
   - rewrites: `/api/(.*)` → `/api/index`; everything else → `/index.html` (SPA)
+  - `regions`: `["iad1"]` (next to the Turso DB in aws-us-east-1, §17.11)
   - `functions["api/index.py"]`: `maxDuration` 60, `excludeFiles` for `backend/tests/**`, `frontend/**`, `docs/**`, `tickets/**`
   - `ignoreCommand`: skip deploys when only `*.md`, `tickets/`, `docs/`, `backend/tests/` or `.github/` changed (keeps Vercel usage low)
 - Python deps for Vercel: root `requirements.txt`, the runtime deps of §2.2 plus `libsql`, minus `uvicorn` and `yfinance` (adapters whose library is missing are skipped, `plugins.import_all`). Vercel never fetches from data sources.
@@ -1727,7 +1728,7 @@ Vercel env: `STOCK_RUNTIME=vercel`, `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`, `A
 `scripts/make_seed.py --from ~/ketul/claude_projects/stock-tools/data/stock.db --out data/seed.db` (N003):
 - Opens the laptop DB **read-only** (`file:…?mode=ro` URI) and `VACUUM INTO` the output. The laptop app may keep running; nothing in stock-tools is written.
 - On the copy only: deletes `job_runs`, `job_items` and `ai_requests` history and the laptop backup alerts. Sets `ai_provider` = `"copy_prompt"`, `backtest_workers` = 3, `jobs_paused` = false. Drops the laptop-only `backup*` settings rows so defaults apply. Sets `journal_mode=WAL` (Turso import needs it). Runs `quick_check`, prints the row counts per table and the file size.
-- Prints the owner's next command: `turso db import data/seed.db` (or `turso db create nse-radar --from-file data/seed.db`). A file import doesn't count against the 10M monthly row writes; inserting 8.9M rows through SQL would use most of them.
+- Prints the owner's next command: `turso db create nse-radar --group us --from-file data/seed.db` (§17.11). A file import doesn't count against the 10M monthly row writes; inserting 8.9M rows through SQL would use most of them.
 
 ### §17.7 AI in the cloud
 
@@ -1762,3 +1763,9 @@ scripts/make_seed.py  scripts/spike_cloud.py
 docs/CLOUD_SETUP.md  docs/CLOUD_SPIKE.md  docs/CLOUD_ROUTES.md
 ```
 New dependency: `libsql` (Python, the Turso driver). Nothing else unless a ticket allows it.
+
+### §17.11 Spike findings that are now contracts (N001, `docs/CLOUD_SPIKE.md`)
+- The Turso DB lives in group `us`, **aws-us-east-1**, next to GitHub's runners and Vercel `iad1`. A remote statement costs 3–4 round trips, so distance dominates.
+- libsql rows are tuples and its errors are `ValueError`s: `db.connect()` in Turso mode returns the N002 wrapper, never a raw libsql connection.
+- `executemany` is batched by the wrapper. Job code that writes in a per-row loop is slow remotely (~20 ms+ per statement even in-region); when a drain shows a slow job, batch its writes with `executemany`.
+- Turso's free plan also caps **embedded syncs at 3 GB/month**, so keep the replica in the Actions cache.
