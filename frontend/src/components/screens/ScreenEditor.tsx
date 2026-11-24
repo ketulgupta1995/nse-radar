@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table";
 import { Input } from "@/components/ui/input";
+import { useIsPhone } from "@/lib/useIsPhone";
 import Num from "../Num";
 import DescribeScreen, { type Accepted } from "./DescribeScreen";
 import RuleBuilder from "../rules/RuleBuilder";
@@ -30,9 +31,11 @@ interface Props {
   /** Slot above the rule builder (T047's "Describe in words" box). */
   aboveBuilder?: ReactNode;
   meta?: RuleMeta;
+  /** Phone footer button; given only for a screen that is already saved. */
+  onBacktest?: () => void;
 }
 
-export default function ScreenEditor({ initial, onSave, onCancel, aboveBuilder, meta }: Props) {
+export default function ScreenEditor({ initial, onSave, onCancel, aboveBuilder, meta, onBacktest }: Props) {
   const [draft, setDraft] = useState<Draft>(initial);
   const [preview, setPreview] = useState<ScreenPreview | null>(null);
   const [busy, setBusy] = useState<"preview" | "save" | null>(null);
@@ -110,15 +113,17 @@ export default function ScreenEditor({ initial, onSave, onCancel, aboveBuilder, 
     [columns.join("|")],
   );
 
-  return (
-    <Card className="flex flex-col gap-3">
-      <label className="flex items-center gap-2">
-        Name <Input className="flex-1" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
+  const phone = useIsPhone();
+  const fieldRow = phone ? "flex flex-col gap-1" : "flex items-center gap-2";
+  const body = (
+    <>
+      <label className={fieldRow}>
+        Name <Input className={phone ? "h-10 w-full" : "flex-1"} value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
       </label>
-      <label className="flex items-center gap-2">
+      <label className={fieldRow}>
         What it looks for{" "}
         <Input
-          className="flex-1"
+          className={phone ? "h-10 w-full" : "flex-1"}
           value={draft.description}
           onChange={(e) => setDraft({ ...draft, description: e.target.value })}
         />
@@ -128,13 +133,15 @@ export default function ScreenEditor({ initial, onSave, onCancel, aboveBuilder, 
       <div ref={builderRef} tabIndex={-1}>
         <RuleBuilder value={draft.rule} onChange={(rule) => { setDraft({ ...draft, rule }); setPreview(null); }} meta={meta} />
       </div>
-      <div className="flex gap-2">
-        <Button variant="outline" disabled={busy !== null} onClick={doPreview}>
-          {busy === "preview" ? "Checking…" : "Preview"}
-        </Button>
-        <Button disabled={busy !== null} onClick={doSave}>Save</Button>
-        <Button variant="ghost" onClick={onCancel}>Cancel</Button>
-      </div>
+      {!phone && (
+        <div className="flex gap-2">
+          <Button variant="outline" disabled={busy !== null} onClick={doPreview}>
+            {busy === "preview" ? "Checking…" : "Preview"}
+          </Button>
+          <Button disabled={busy !== null} onClick={doSave}>Save</Button>
+          <Button variant="ghost" onClick={onCancel}>Cancel</Button>
+        </div>
+      )}
       {busy === "preview" && waiting && (
         <p className="text-muted-foreground" role="status">
           Checking every stock. {waiting}
@@ -152,6 +159,35 @@ export default function ScreenEditor({ initial, onSave, onCancel, aboveBuilder, 
           )}
         </div>
       )}
-    </Card>
+    </>
+  );
+
+  if (!phone) return <Card className="flex flex-col gap-3">{body}</Card>;
+  // Phone: a full-screen sheet; Preview / Save / Backtest this stay in a sticky footer (SPEC §17.9).
+  return (
+    <div
+      role="dialog"
+      aria-label="Edit screen"
+      className="fixed inset-0 z-50 flex flex-col bg-background"
+      data-testid="screen-sheet"
+    >
+      <div className="flex items-center justify-between border-b border-border px-4 py-2">
+        <strong>{initial.name ? "Edit screen" : "New screen"}</strong>
+        <Button variant="ghost" className="h-10" onClick={onCancel}>Cancel</Button>
+      </div>
+      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-3">{body}</div>
+      <div
+        className="grid grid-cols-2 gap-2 border-t border-border bg-card px-4 pt-2"
+        style={{ paddingBottom: "calc(0.5rem + env(safe-area-inset-bottom, 0px))" }}
+      >
+        <Button variant="outline" className="h-10" disabled={busy !== null} onClick={doPreview}>
+          {busy === "preview" ? "Checking…" : "Preview"}
+        </Button>
+        <Button className="h-10" disabled={busy !== null} onClick={doSave}>Save</Button>
+        {onBacktest && (
+          <Button variant="outline" className="col-span-2 h-10" onClick={onBacktest}>Backtest this</Button>
+        )}
+      </div>
+    </div>
   );
 }

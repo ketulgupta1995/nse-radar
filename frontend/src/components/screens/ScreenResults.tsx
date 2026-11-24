@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
 import { EmptyState } from "@/components/ui/empty-state";
 import { toast } from "@/components/ui/toaster";
+import { useIsPhone } from "@/lib/useIsPhone";
 import Num from "../Num";
 
 /** Symbols first seen in the latest run. Not flagged when everything is new (nothing to compare with). */
@@ -74,11 +75,13 @@ export default function ScreenResults({ results }: { results: ScreenResult[] }) 
   const dir = sorting[0]?.desc ? -1 : 1;
   const rows = useMemo(() => sortResults(results, key, dir), [results, key, dir]);
 
-  const cols = useMemo<ColumnDef<ScreenResult>[]>(
+  const phone = useIsPhone();
+  const baseCols = useMemo<ColumnDef<ScreenResult>[]>(
     () => [
       {
         id: "symbol",
         header: "Symbol",
+        meta: { phone: "title" },
         accessorFn: (r) => r.symbol,
         cell: ({ row }) => (
           <Link to={`/stock/${encodeURIComponent(row.original.symbol)}`} className="font-mono" onClick={(e) => e.stopPropagation()}>
@@ -86,7 +89,7 @@ export default function ScreenResults({ results }: { results: ScreenResult[] }) 
           </Link>
         ),
       },
-      { id: "name", header: "Name", accessorFn: (r) => r.name ?? "", cell: ({ row }) => row.original.name },
+      { id: "name", header: "Name", meta: { phone: "subtitle" }, accessorFn: (r) => r.name ?? "", cell: ({ row }) => row.original.name },
       ...columns.map<ColumnDef<ScreenResult>>((c) => ({
         id: `v:${c}`,
         header: c,
@@ -121,6 +124,12 @@ export default function ScreenResults({ results }: { results: ScreenResult[] }) 
     ],
     [columns, fresh, showScore],
   );
+  // A phone card shows the first few numbers, so the score goes first there.
+  const cols = useMemo(() => {
+    if (!phone || !showScore) return baseCols;
+    const score = baseCols.find((c) => c.id === "score");
+    return score ? [...baseCols.slice(0, 2), score, ...baseCols.slice(2).filter((c) => c !== score)] : baseCols;
+  }, [baseCols, phone, showScore]);
 
   const doCopy = async (what: string, text: string) => {
     const ok = await copy(text);
@@ -133,7 +142,7 @@ export default function ScreenResults({ results }: { results: ScreenResult[] }) 
   }
   return (
     <div>
-      <p className="flex items-center gap-2">
+      <p className="flex flex-wrap items-center gap-2">
         <Button variant="outline" size="sm" onClick={() => doCopy("the symbols", rows.map((r) => r.symbol).join("\n"))}>
           Copy symbols
         </Button>

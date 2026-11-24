@@ -30,7 +30,7 @@ Status values: `todo` · `done` · `blocked` (add a reason).
 | N013 | DataTable shows rows as cards on a phone | N012 | sonnet | done |
 | N014 | Dashboard, Alerts and Watchlist on a phone | N013 | sonnet | done |
 | N015 | Stock page on a phone | N013 | sonnet | done |
-| N016 | Screener and rule builder on a phone | N013 | sonnet | todo |
+| N016 | Screener and rule builder on a phone | N013 | sonnet | done |
 | N017 | Portfolio, Journal and Track record on a phone | N013 | sonnet | todo |
 | N018 | Backtests on a phone | N013, N005 | sonnet | todo |
 | N019 | Jobs, Sources and Settings on a phone, plus "Cloud" | N013, N005, N008 | sonnet | todo |

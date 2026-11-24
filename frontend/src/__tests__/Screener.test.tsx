@@ -8,9 +8,11 @@ import ScreenResults, { newSymbols, sortResults } from "../components/screens/Sc
 import Screener from "../pages/Screener";
 import { RUN_POLL_MS } from "../lib/runs";
 import { resetRuntime } from "../lib/useRuntime";
+import { setPhone } from "./phone";
 
 afterEach(() => {
   cleanup();
+  setPhone(false);
   resetRuntime();
   vi.unstubAllGlobals();
   vi.useRealTimers();
@@ -282,4 +284,42 @@ test("editor preview shows why a failed preview job failed", async () => {
   );
   fireEvent.click(screen.getByText("Preview"));
   expect((await screen.findByRole("alert")).textContent).toContain("RuleError: all[0]: no data");
+});
+
+// ---- Phone (N016) ----
+
+test("phone: pick a screen from the select, run it, and see results as cards", async () => {
+  setPhone(true);
+  page();
+  const pick = (await screen.findByLabelText("Screen")) as HTMLSelectElement;
+  expect(screen.getByText("+ New screen")).toBeTruthy();
+  fireEvent.change(pick, { target: { value: "2" } });
+  await screen.findByText("MINE");
+  const card = screen.getByText("MINE").closest("[data-testid=phone-card]") as HTMLElement;
+  expect(card).toBeTruthy();
+  expect(within(card).getByText("MINE Ltd")).toBeTruthy();
+  fireEvent.click(screen.getByText("Run now"));
+  await waitFor(() => expect(a.calls).toContain("POST /api/screens/2/run"));
+});
+
+test("phone: the editor is a full-screen sheet; add a condition and save sends the rule", async () => {
+  setPhone(true);
+  page();
+  fireEvent.click(await screen.findByText("+ New screen"));
+  const sheet = await screen.findByTestId("screen-sheet");
+  fireEvent.change(within(sheet).getByLabelText(/^Name/), { target: { value: "Phone screen" } });
+  await within(sheet).findByText("Add group");
+  expect(within(sheet).getAllByTestId("condition-card")).toHaveLength(1);
+  fireEvent.click(within(sheet).getByText("Add condition"));
+  expect(within(sheet).getAllByTestId("condition-card")).toHaveLength(2);
+  expect(within(sheet).getByText("Preview")).toBeTruthy();
+  expect(within(sheet).queryByText("Backtest this")).toBeNull(); // not saved yet
+  fireEvent.click(within(sheet).getByText("Save"));
+  await waitFor(() => expect(a.calls).toContain("POST /api/screens"));
+  const post = (fetch as unknown as { mock: { calls: [string, RequestInit?][] } }).mock.calls.find(
+    (c) => c[0] === "/api/screens" && c[1]?.method === "POST",
+  );
+  const body = JSON.parse(String(post?.[1]?.body));
+  expect(body.name).toBe("Phone screen");
+  expect(body.rule.all).toHaveLength(2);
 });

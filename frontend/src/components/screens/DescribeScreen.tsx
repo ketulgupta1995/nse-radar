@@ -6,6 +6,7 @@ import Explain from "../Explain";
 import PasteAnswerDialog from "../ai/PasteAnswerDialog";
 import CustomIndicatorReview from "./CustomIndicatorReview";
 import { Button } from "@/components/ui/button";
+import { useIsPhone } from "@/lib/useIsPhone";
 
 export interface DescribeResult {
   ok: boolean;
@@ -57,6 +58,7 @@ const POLL_MS = 2000;
 const msg = (e: unknown) => (e instanceof ApiError ? e.message : String(e));
 
 export default function DescribeScreen({ onAccept }: Props) {
+  const phone = useIsPhone();
   const [text, setText] = useState("");
   const [req, setReq] = useState<AiRequest | null>(null);
   const [busy, setBusy] = useState(false);
@@ -250,13 +252,14 @@ export default function DescribeScreen({ onAccept }: Props) {
         <Explain text="Claude turns your sentence into a screen rule. You can review and change it before anything is saved." />
         <textarea
           rows={3}
+          className={phone ? "block w-full" : undefined}
           value={text}
           placeholder="e.g. stocks near 52-week highs with rising profits and low debt"
           onChange={(e) => setText(e.target.value)}
         />
       </label>
       <p>
-        <Button variant="outline" size="sm" disabled={busy || !text.trim()} onClick={() => void start()}>
+        <Button variant="outline" size="sm" className={phone ? "h-10 w-full" : undefined} disabled={busy || !text.trim()} onClick={() => void start()}>
           Make screen
         </Button>
       </p>

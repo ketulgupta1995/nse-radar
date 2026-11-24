@@ -8,7 +8,9 @@ import ScreenResults from "../components/screens/ScreenResults";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Select } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useIsPhone } from "@/lib/useIsPhone";
 import { toast } from "@/components/ui/toaster";
 import { emptyRule } from "../lib/rules";
 
@@ -26,6 +28,7 @@ export default function Screener() {
   const [runText, setRunText] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
+  const phone = useIsPhone();
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const msg = (e: unknown) => (e instanceof ApiError ? e.message : String(e));
 
@@ -123,27 +126,50 @@ export default function Screener() {
     toast.success(`Saved "${saved.name}".`);
   };
 
+  const onNew = () => setMode({ kind: "edit", id: null, draft: { name: "", description: "", rule: emptyRule() } });
+  const onDuplicate = (s: Screen) =>
+    setMode({
+      kind: "edit",
+      id: null,
+      draft: { name: `${s.name} (copy)`, description: s.description ?? "", rule: s.rule },
+    });
+  const onSelect = (id: number) => {
+    setSelectedId(id);
+    setMode({ kind: "view" });
+  };
+
   return (
     <div className="screener">
       <h1>Screener</h1>
       {error && <p className="neg" role="alert">{error}</p>}
-      <div className="grid grid-cols-[260px_minmax(0,1fr)] items-start gap-6">
-        {!loaded ? <Skeleton className="h-40" /> : <ScreenList
-          screens={screens}
-          selectedId={selectedId}
-          onSelect={(id) => {
-            setSelectedId(id);
-            setMode({ kind: "view" });
-          }}
-          onNew={() => setMode({ kind: "edit", id: null, draft: { name: "", description: "", rule: emptyRule() } })}
-          onDuplicate={(s) =>
-            setMode({
-              kind: "edit",
-              id: null,
-              draft: { name: `${s.name} (copy)`, description: s.description ?? "", rule: s.rule },
-            })
-          }
-        />}
+      <div className={phone ? "flex flex-col gap-3" : "grid grid-cols-[260px_minmax(0,1fr)] items-start gap-6"}>
+        {!loaded ? (
+          <Skeleton className="h-40" />
+        ) : phone ? (
+          <div className="flex flex-col gap-2">
+            <Select
+              className="h-10 w-full"
+              aria-label="Screen"
+              value={selectedId ?? ""}
+              onChange={(e) => onSelect(Number(e.target.value))}
+            >
+              {screens.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name} ({s.count} {s.count === 1 ? "match" : "matches"})
+                </option>
+              ))}
+            </Select>
+            <Button variant="outline" className="h-10 w-full" onClick={onNew}>+ New screen</Button>
+          </div>
+        ) : (
+          <ScreenList
+            screens={screens}
+            selectedId={selectedId}
+            onSelect={onSelect}
+            onNew={onNew}
+            onDuplicate={onDuplicate}
+          />
+        )}
         <main>
           {mode.kind === "edit" ? (
             <ScreenEditor
@@ -151,13 +177,20 @@ export default function Screener() {
               initial={mode.draft}
               onSave={save}
               onCancel={() => setMode({ kind: "view" })}
+              onBacktest={mode.id !== null ? () => navigate(`/backtests/new?screen=${mode.id}`) : undefined}
             />
           ) : selected ? (
             <Card>
               <h2>{selected.name}</h2>
               {selected.description && <p>{selected.description}</p>}
               <p className="rule-describe">{selected.describe}</p>
-              <p className="flex flex-wrap items-center gap-2">
+              <p className={phone ? "flex flex-col gap-2 [&>*]:h-10 [&>*]:w-full" : "flex flex-wrap items-center gap-2"}>
+                {phone && <Button onClick={runNow}>Run now</Button>}
+                {phone && selected.is_preset && (
+                  <Button variant="outline" aria-label={`Duplicate ${selected.name}`} onClick={() => onDuplicate(selected)}>
+                    Duplicate to edit
+                  </Button>
+                )}
                 {!selected.is_preset && (
                   <Button
                     variant="outline"
@@ -172,7 +205,7 @@ export default function Screener() {
                     Edit
                   </Button>
                 )}
-                <Button onClick={runNow}>Run now</Button>
+                {!phone && <Button onClick={runNow}>Run now</Button>}
                 <Button variant="outline" onClick={backtestThis}>Backtest this</Button>
                 {!selected.is_preset &&
                   (confirmDelete ? (

@@ -1,6 +1,8 @@
 import type { FundField, IndicatorDef } from "../../api/types";
 import type { Operand } from "../../lib/rules";
 import Explain from "../Explain";
+import { useIsPhone } from "@/lib/useIsPhone";
+import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 
@@ -39,6 +41,9 @@ interface Props {
 }
 
 export default function OperandPicker({ value, onChange, meta, label }: Props) {
+  const phone = useIsPhone();
+  const full = phone ? "h-10 w-full" : undefined;
+  const small = phone ? "h-10 w-24" : undefined;
   const key = operandKey(value);
   const prices = meta.catalogue.filter((d) => PRICE_NAMES.includes(d.name));
   const others = meta.catalogue.filter((d) => !PRICE_NAMES.includes(d.name));
@@ -64,8 +69,8 @@ export default function OperandPicker({ value, onChange, meta, label }: Props) {
   };
 
   return (
-    <span className="operand">
-      <Select aria-label={label} value={key} onChange={(e) => onChange(fresh(e.target.value, meta))}>
+    <span className={cn("operand", phone && "flex w-full flex-col items-stretch gap-2")}>
+      <Select className={full} aria-label={label} value={key} onChange={(e) => onChange(fresh(e.target.value, meta))}>
         <optgroup label="Price">
           {prices.map((d) => (
             <option key={d.name} value={`ind:${d.name}`}>{d.label}</option>
@@ -87,7 +92,9 @@ export default function OperandPicker({ value, onChange, meta, label }: Props) {
       </Select>
       {"value" in value && (
         <Input
+          className={full}
           type="number"
+          inputMode="decimal"
           step="any"
           aria-label={`${label} number`}
           value={value.value}
@@ -104,7 +111,9 @@ export default function OperandPicker({ value, onChange, meta, label }: Props) {
           <label key={p.name} className="param">
             {p.label}{" "}
             <Input
+              className={small}
               type="number"
+              inputMode="decimal"
               aria-label={`${label} ${p.label}`}
               min={p.min}
               max={p.max}
@@ -140,7 +149,9 @@ export default function OperandPicker({ value, onChange, meta, label }: Props) {
         <label className="param">
           × times{" "}
           <Input
+            className={small}
             type="number"
+            inputMode="decimal"
             aria-label={`${label} times`}
             min={0}
             step="any"
@@ -156,7 +167,9 @@ export default function OperandPicker({ value, onChange, meta, label }: Props) {
           <label className="param">
             Value from N days ago{" "}
             <Input
+              className={small}
               type="number"
+              inputMode="decimal"
               aria-label={`${label} days ago`}
               min={0}
               step={1}

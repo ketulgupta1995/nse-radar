@@ -9,6 +9,8 @@ import ConditionRow from "./ConditionRow";
 import type { RuleMeta } from "./OperandPicker";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
+import { useIsPhone } from "@/lib/useIsPhone";
+import { cn } from "@/lib/utils";
 
 interface Props {
   node: Group;
@@ -40,11 +42,15 @@ function Child({ node, ...rest }: { node: Node } & Omit<Props, "node" | "root">)
 }
 
 export default function GroupBox({ node, meta, onChange, fits, root }: Props) {
+  const phone = useIsPhone();
+  // On a phone a group is an indented left border, not a box that gets narrower with depth.
+  const boxClass = phone ? cn("my-2", !root && "ml-2 border-l-2 border-border pl-2") : "group-box";
+  const btn = phone ? "h-10 w-full" : undefined;
   if ("not" in node) {
     const inner = node.not;
     const unwrap = () => onChange(isCond(inner) ? (root ? { all: [inner] } : inner) : inner);
     return (
-      <div className="group-box not-box">
+      <div className={cn(boxClass, !phone && "not-box")}>
         <label>
           <input type="checkbox" checked onChange={unwrap} /> NOT (the opposite of the following)
         </label>
@@ -71,9 +77,10 @@ export default function GroupBox({ node, meta, onChange, fits, root }: Props) {
   const wrapNot = () => (fits({ not: node }) ? onChange({ not: node }) : undefined);
 
   return (
-    <div className="group-box">
-      <div className="group-head">
+    <div className={boxClass}>
+      <div className={phone ? "my-1 flex flex-col gap-2" : "group-head"}>
         <Select
+          className={btn}
           aria-label="Match mode"
           value={kind}
           onChange={(e) => onChange(e.target.value === "all" ? { all: list } : { any: list })}
@@ -85,12 +92,12 @@ export default function GroupBox({ node, meta, onChange, fits, root }: Props) {
           <input type="checkbox" checked={false} disabled={!fits({ not: node })} onChange={wrapNot} /> NOT
         </label>
         {!root && (
-          <Button variant="outline" size="sm" type="button" aria-label="Remove group" onClick={() => onChange(null)}>
+          <Button variant="outline" size="sm" className={btn} type="button" aria-label="Remove group" onClick={() => onChange(null)}>
             Remove group
           </Button>
         )}
       </div>
-      <div className="group-body">
+      <div className={phone ? undefined : "group-body"}>
         {list.map((child, i) => (
           <Child
             key={i}
@@ -102,16 +109,17 @@ export default function GroupBox({ node, meta, onChange, fits, root }: Props) {
         ))}
         {list.length === 0 && <p className="neg">Add at least one condition.</p>}
       </div>
-      <div className="group-foot">
-        <Button variant="outline" size="sm" type="button" disabled={!canAdd(emptyCondition())} onClick={() => set([...list, emptyCondition()])}>
-          + condition
+      <div className={phone ? "my-1 flex flex-col gap-2" : "group-foot"}>
+        <Button variant="outline" size="sm" className={btn} type="button" disabled={!canAdd(emptyCondition())} onClick={() => set([...list, emptyCondition()])}>
+          {phone ? "Add condition" : "+ condition"}
         </Button>
         <Button variant="outline" size="sm"
+          className={btn}
           type="button"
           disabled={!canAdd({ all: [emptyCondition()] })}
           onClick={() => set([...list, { all: [emptyCondition()] }])}
         >
-          + group
+          {phone ? "Add group" : "+ group"}
         </Button>
       </div>
     </div>
