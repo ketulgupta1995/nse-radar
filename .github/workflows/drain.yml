@@ -43,7 +43,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: |
-            data/replica.db
+            data/replica.db*
             data/cache/price_store.pkl
           key: replica-${{ github.run_id }}
           restore-keys: replica-
@@ -62,7 +62,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: |
-            data/replica.db
+            data/replica.db*
             data/cache/price_store.pkl
           key: replica-${{ github.run_id }}
       # N011 adds the encrypted backup upload here.
