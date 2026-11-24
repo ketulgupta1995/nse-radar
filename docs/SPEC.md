@@ -1771,3 +1771,10 @@ New dependency: `libsql` (Python, the Turso driver). Nothing else unless a ticke
 - Turso's free plan also caps **embedded syncs at 3 GB/month**, so keep the replica in the Actions cache.
 - Turso refuses `PRAGMA user_version=N`. The schema version is `db.schema_version(conn)`: `user_version`, or the one-row `schema_meta` table when the PRAGMA was refused. Never read `PRAGMA user_version` directly in new code.
 - DDL run through Turso gets keyword column names uppercased (`key`, `rows`, `explain`, `trigger` → `KEY`…). The wrapper lowercases all-caps column names in results. Never use an all-caps column alias.
+
+### §17.12 Contract changes from the route audit (N009, `docs/CLOUD_ROUTES.md`)
+These override §8.3 and §10 where they differ.
+- `POST /api/screens/preview` → `{"run_id": int}` (job `screen_preview`). The matches are the run's `ok` `job_items` (key = symbol, detail = the values as JSON).
+- `POST /api/custom-indicators/{id}/approve` → the still-pending indicator plus `run_id` (job `indicator_approve`). `sample` is no longer in the response; the 5 sample values are in the run's message.
+- Precomputed results that Vercel reads: settings `score_prices` (written by `screens_run`) and `bars_coverage` (written by `housekeeping`).
+

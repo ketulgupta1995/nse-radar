@@ -34,6 +34,7 @@ Status values: `todo` · `done` · `blocked` (add a reason).
 | N017 | Portfolio, Journal and Track record on a phone | N013 | sonnet | todo |
 | N018 | Backtests on a phone | N013, N005 | sonnet | todo |
 | N019 | Jobs, Sources and Settings on a phone, plus "Cloud" | N013, N005, N008 | sonnet | todo |
-| N020 | Go live | N001–N011 | Opus + owner | todo |
+| N020 | Go live | N001–N011, N021 | Opus + owner | todo |
+| N021 | Cloud gaps found by the route audit | N009, N005 | opus | todo |
 
 N012–N017 don't depend on the cloud tickets and can run while N001 waits on the owner.
