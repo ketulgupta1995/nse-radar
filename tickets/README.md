@@ -24,7 +24,7 @@ Status values: `todo` · `done` · `blocked` (add a reason).
 | N007 | Vercel entry point and config | N004 | sonnet | done |
 | N008 | Password gate | N007 | sonnet | done |
 | N009 | Make every Vercel route light | N007 | opus | done |
-| N010 | AI by copy-prompt in the cloud | N007 | sonnet | todo |
+| N010 | AI by copy-prompt in the cloud | N007 | sonnet | done |
 | N011 | Weekly encrypted backup from the cloud worker | N006 | sonnet | todo |
 | N012 | Phone shell: top bar, bottom tabs, More sheet, search | — | sonnet | done |
 | N013 | DataTable shows rows as cards on a phone | N012 | sonnet | done |

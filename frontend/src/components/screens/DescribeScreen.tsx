@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { ApiError, api } from "../../api/client";
-import type { CustomIndicator } from "../../api/types";
+import type { AiCreated, CustomIndicator } from "../../api/types";
 import type { Rule } from "../../lib/rules";
 import Explain from "../Explain";
+import PasteAnswerDialog from "../ai/PasteAnswerDialog";
 import CustomIndicatorReview from "./CustomIndicatorReview";
 import { Button } from "@/components/ui/button";
 
@@ -69,6 +70,8 @@ export default function DescribeScreen({ onAccept }: Props) {
   const [codePrompt, setCodePrompt] = useState<string | null>(null);
   const [review, setReview] = useState<CustomIndicator | null>(null);
   const [rerun, setRerun] = useState(false);
+  // copy_prompt provider (SPEC §17.7): a request waiting for the owner to paste Claude's answer.
+  const [pending, setPending] = useState<{ id: number; prompt: string; what: "rule" | "code" } | null>(null);
 
   const id = req?.id;
   useEffect(() => {
@@ -151,10 +154,15 @@ export default function DescribeScreen({ onAccept }: Props) {
     setCodeReq(null);
     setCodeBusy(true);
     try {
-      const r = await api.post<{ id: number; run_id: number }>("/ai/requests", {
+      const r = await api.post<AiCreated>("/ai/requests", {
         kind: "indicator_code",
         payload: need,
       });
+      if (r.status === "awaiting_answer") {
+        setCodeBusy(false);
+        setPending({ id: r.id, prompt: r.prompt ?? "", what: "code" });
+        return;
+      }
       setCodeReq({ id: r.id, run_id: r.run_id, status: "queued", error: null, result: null });
     } catch (e) {
       setCodeError(msg(e));
@@ -191,10 +199,15 @@ export default function DescribeScreen({ onAccept }: Props) {
     setReq(null);
     setBusy(true);
     try {
-      const r = await api.post<{ id: number; run_id: number }>("/ai/requests", {
+      const r = await api.post<AiCreated>("/ai/requests", {
         kind: "rule_from_text",
         payload: { text: text.trim() },
       });
+      if (r.status === "awaiting_answer") {
+        setBusy(false);
+        setPending({ id: r.id, prompt: r.prompt ?? "", what: "rule" });
+        return;
+      }
       setReq({ id: r.id, run_id: r.run_id, status: "queued", error: null, result: null });
     } catch (e) {
       setError(msg(e));
@@ -277,6 +290,22 @@ export default function DescribeScreen({ onAccept }: Props) {
             </div>
           )}
         </div>
+      )}
+      {pending && (
+        <PasteAnswerDialog<AiRequest & CodeRequest>
+          requestId={pending.id}
+          prompt={pending.prompt}
+          onClose={() => setPending(null)}
+          onSaved={(r) => {
+            const what = pending.what;
+            setPending(null);
+            if (what === "rule") setReq(r);
+            else {
+              setCodeReq(r);
+              void finishCode(r);
+            }
+          }}
+        />
       )}
       {review && (
         <CustomIndicatorReview

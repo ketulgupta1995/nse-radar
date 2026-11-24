@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { ApiError, api } from "../../api/client";
+import type { AiCreated } from "../../api/types";
 import Markdown from "./Markdown";
+import PasteAnswerDialog from "./PasteAnswerDialog";
 
 interface AiRequest {
   id: number;
@@ -34,6 +36,7 @@ export default function AskClaude({ kind, symbol, payload, label, onDone }: Prop
   const [elapsed, setElapsed] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [pending, setPending] = useState<{ id: number; prompt: string } | null>(null);
   const doneRef = useRef(onDone);
   doneRef.current = onDone;
 
@@ -73,7 +76,13 @@ export default function AskClaude({ kind, symbol, payload, label, onDone }: Prop
     setReq(null);
     setBusy(true);
     try {
-      const r = await api.post<{ id: number; run_id: number }>("/ai/requests", { kind, symbol, payload });
+      const r = await api.post<AiCreated>("/ai/requests", { kind, symbol, payload });
+      if (r.status === "awaiting_answer") {
+        // copy_prompt provider (SPEC §17.7): no job, the owner pastes Claude's answer.
+        setBusy(false);
+        setPending({ id: r.id, prompt: r.prompt ?? "" });
+        return;
+      }
       setReq({ id: r.id, run_id: r.run_id, status: "queued", response: null, error: null });
     } catch (e) {
       setError(msg(e));
@@ -100,6 +109,12 @@ export default function AskClaude({ kind, symbol, payload, label, onDone }: Prop
     } catch (e) {
       setError(msg(e));
     }
+  };
+
+  const saved = (r: AiRequest) => {
+    setPending(null);
+    setReq(r);
+    if (r.status === "done" && r.response) doneRef.current?.(r.response);
   };
 
   const failed = req && (req.status === "failed" || req.status === "cancelled");
@@ -130,6 +145,14 @@ export default function AskClaude({ kind, symbol, payload, label, onDone }: Prop
           <p className="neg">{req.error ?? `Request ${req.status}`}</p>
           <button type="button" onClick={() => void copyPrompt()}>Copy prompt instead</button>
         </div>
+      )}
+      {pending && (
+        <PasteAnswerDialog<AiRequest>
+          requestId={pending.id}
+          prompt={pending.prompt}
+          onSaved={saved}
+          onClose={() => setPending(null)}
+        />
       )}
       {req?.status === "done" && req.response && <Markdown text={req.response} />}
       <p className="muted">Uses your Claude Pro plan limits.</p>

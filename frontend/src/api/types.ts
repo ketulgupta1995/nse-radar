@@ -249,6 +249,15 @@ export interface AiStatus {
   providers: { name: string; label: string }[];
 }
 
+/** POST /api/ai/requests. With the copy_prompt provider there is no job: run_id is null,
+ * status is "awaiting_answer" and `prompt` is what to paste into Claude (SPEC §17.7). */
+export interface AiCreated {
+  id: number;
+  run_id: number | null;
+  status?: "awaiting_answer";
+  prompt?: string;
+}
+
 /** GET /api/me (password gate, SPEC §17.5). */
 export interface Me {
   auth_required: boolean;

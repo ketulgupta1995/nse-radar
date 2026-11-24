@@ -11,12 +11,17 @@ from app.ai import base
 from app.jobs import runner
 
 router = APIRouter()
+AWAITING = "awaiting_answer"
 
 
 class RequestIn(BaseModel):
     kind: str
     symbol: str | None = None
     payload: dict | None = None
+
+
+class AnswerIn(BaseModel):
+    text: str
 
 
 class PromptIn(BaseModel):
@@ -91,14 +96,32 @@ def create_request(body: RequestIn) -> dict:
              timeutil.now_iso()),
         )  # fmt: skip
         rid = int(cur.lastrowid)
+    if _manual(prov.name):
+        # SPEC §17.7: no job; the owner pastes Claude's answer into /answer.
+        return {"id": rid, "run_id": None, "status": AWAITING, "prompt": prompt}
     run_id = runner.enqueue("ai_request", params={"request_id": rid})
     with db.tx() as c:
         c.execute("UPDATE ai_requests SET run_id=? WHERE id=?", (run_id, rid))
     return {"id": rid, "run_id": run_id}
 
 
+def _manual(provider_name: str | None) -> bool:
+    """True for a provider whose answer the owner pastes in (it never runs as a job)."""
+    if not provider_name:
+        return False
+    try:
+        return bool(getattr(base.provider(provider_name), "manual_answer", False))
+    except base.AIError:
+        return False
+
+
+def _awaiting(r: sqlite3.Row) -> bool:
+    # schema.sql has no 'awaiting_answer' status: it is stored as 'queued' with no run.
+    return r["status"] == "queued" and r["run_id"] is None and _manual(r["provider"])
+
+
 def _row(r: sqlite3.Row, run_status: str | None) -> dict:
-    status = r["status"]
+    status = AWAITING if _awaiting(r) else r["status"]
     # A run stopped while still queued (or lost in a restart) never reaches the job body.
     if status in ("queued", "running") and run_status in ("cancelled", "interrupted", "failed"):
         status = "cancelled" if run_status == "cancelled" else "failed"
@@ -124,6 +147,37 @@ def get_request(request_id: int) -> dict:
     if r is None:
         raise HTTPException(404, "no such AI request")
     return _row(r, r["run_status"])
+
+
+def _parse_answer(kind: str, text: str, payload: dict) -> tuple[str, dict | None, str | None]:
+    """Run the task's postprocess on a pasted answer, like the ai_request job does."""
+    try:
+        post = base.task(kind).postprocess
+        result = post(text, payload) if post else None
+    except (base.AIError, KeyError) as e:
+        return "failed", None, str(e)
+    return "done", result, None
+
+
+@router.post("/ai/requests/{request_id}/answer")
+def answer_request(request_id: int, body: AnswerIn) -> dict:
+    text = body.text.strip()
+    if not text:
+        raise HTTPException(400, "paste Claude's answer first")
+    with db.tx() as c:
+        r = c.execute("SELECT * FROM ai_requests WHERE id=?", (request_id,)).fetchone()
+    if r is None:
+        raise HTTPException(404, "no such AI request")
+    # A pasted answer may replace an earlier one, but never a job-run request.
+    if r["run_id"] is not None or not _manual(r["provider"]):
+        raise HTTPException(409, "this request was sent to Claude by a job, not pasted")
+    status, result, error = _parse_answer(r["kind"], text, json.loads(r["payload"] or "{}"))
+    with db.tx() as c:
+        c.execute(
+            "UPDATE ai_requests SET status=?, response=?, result=?, error=? WHERE id=?",
+            (status, text, json.dumps(result) if result is not None else None, error, request_id),
+        )
+    return get_request(request_id)
 
 
 @router.get("/ai/requests")
