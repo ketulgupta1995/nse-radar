@@ -21,3 +21,5 @@ Phone: the portfolio summary shows above the cards, the add-position sheet posts
 
 
 ## Notes for the planner
+- `Position` has no previous-close or trailing-exit field, so the phone summary omits "today's change" and the cards omit the trailing-exit level. Needs a backend field (outside this ticket).
+- The Journal has no "new entry" form (it lists closed trades); the full-screen sheets are the add-position (`EntryChecklist`) and close-position (`ExitChecklist`) forms, via `checklist/Modal.tsx`, which now also makes `CustomIndicatorReview` a full-screen sheet on a phone.

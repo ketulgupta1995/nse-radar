@@ -158,7 +158,7 @@ export default function EntryChecklist({ symbol, onClose, onSaved, challenge }: 
               <ChecklistForm questions={stepQs(STEPS[1].ids)} values={values} onChange={change} />
               <label className="field stacked">
                 <span>Quantity (shares)</span>
-                <input type="number" value={qty} onChange={(e) => { touched.current.add("qty"); setQty(e.target.value); }} />
+                <input type="number" inputMode="numeric" value={qty} onChange={(e) => { touched.current.add("qty"); setQty(e.target.value); }} />
               </label>
               <div className="sizing card" aria-label="Position sizing">
                 {risk > 0 ? (

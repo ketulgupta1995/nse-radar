@@ -35,7 +35,7 @@ export default function TradeCard({ position: p }: { position: Position }) {
 
   return (
     <Card className="p-3">
-      <button type="button" className="flex w-full cursor-pointer items-center gap-4 border-0 bg-transparent p-0 text-left text-inherit" style={{ font: "inherit" }} aria-expanded={open} onClick={toggle}>
+      <button type="button" className="flex min-h-11 w-full cursor-pointer flex-wrap items-center gap-x-4 gap-y-1 border-0 bg-transparent p-0 text-left text-inherit" style={{ font: "inherit" }} aria-expanded={open} onClick={toggle}>
         <strong>{p.symbol}</strong>
         <span className="muted">{p.entry_date} → {p.exit_date}</span>
         <Num value={p.pnl_pct} kind="pct" colored />
@@ -47,7 +47,7 @@ export default function TradeCard({ position: p }: { position: Position }) {
           {failed && <p className="neg">Couldn't load this trade's checklists.</p>}
           {!lists && !failed && <p className="muted">Loading…</p>}
           {lists && (
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div>
                 <h3>Why I bought</h3>
                 <dl className="summary">

@@ -95,7 +95,7 @@ export default function Journal() {
     <div>
       <h1>Journal</h1>
       <p className="muted">Statistics below cover all closed trades.</p>
-      <div className="mb-4 grid grid-cols-5 gap-3">
+      <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-5">
         <Stat label="Closed trades" help="How many trades you have finished. Small numbers prove little, so be careful drawing conclusions under about 30.">
           {stats.closed}
         </Stat>
@@ -118,7 +118,7 @@ export default function Journal() {
           {lines.map((l) => <li key={l}>{l}</li>)}
         </ul>
       )}
-      <div className="mb-4 flex gap-4">
+      <div className="mb-4 flex flex-col gap-4 md:flex-row">
         <GroupTable title="By exit reason" rows={stats.by_exit_reason} />
         <GroupTable title="By how I felt when buying" rows={stats.by_emotion} />
       </div>

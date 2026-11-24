@@ -1,6 +1,6 @@
 import type { ColumnDef } from "@tanstack/react-table";
 import { Search } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { ApiError, api } from "../api/client";
 import type { Idea, IdeasPage, SignalGroup, SignalsSummary } from "../api/types";
@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { shortDay, todayIso } from "@/lib/dates";
+import { useIsPhone } from "@/lib/useIsPhone";
 import { cn } from "@/lib/utils";
 
 export { R };
@@ -94,6 +95,7 @@ function LoggedIdeas({ screens }: { screens: SignalGroup[] }) {
   const [data, setData] = useState<IdeasPage | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selId, setSelId] = useState<number | null>(null);
+  const phone = useIsPhone();
 
   const update = (patch: Record<string, string>, keepPage = false) => {
     setParams(
@@ -132,7 +134,7 @@ function LoggedIdeas({ screens }: { screens: SignalGroup[] }) {
       .then((d) => {
         if (!live) return;
         setData(d);
-        setSelId((cur) => (cur != null && d.rows.some((r) => r.id === cur) ? cur : (d.rows[0]?.id ?? null)));
+        setSelId((cur) => (cur != null && d.rows.some((r) => r.id === cur) ? cur : phone ? null : (d.rows[0]?.id ?? null)));
       })
       .catch((e) => live && setError(e instanceof ApiError ? e.message : String(e)));
     return () => {
@@ -173,6 +175,7 @@ function LoggedIdeas({ screens }: { screens: SignalGroup[] }) {
       {
         id: "symbol",
         header: "Stock",
+        meta: { phone: "title" },
         accessorFn: (i) => i.symbol,
         cell: ({ row }) => (
           <div className="py-1.5">
@@ -215,6 +218,7 @@ function LoggedIdeas({ screens }: { screens: SignalGroup[] }) {
             id: "progress",
             header: () => <>Stop to target<Explain text="Where today's price sits between your stop (left) and target (right). The thin tick is the entry price." /></>,
             enableSorting: false,
+            meta: { label: "Stop to target" },
             cell: ({ row }) => {
               const i = row.original;
               const entered = ideaStatus(i) !== "pending";
@@ -224,7 +228,7 @@ function LoggedIdeas({ screens }: { screens: SignalGroup[] }) {
       {
         id: "return",
         header: () => <>Return<Explain text={closedTab ? "% gain or loss when the idea ended, after costs." : "% gain or loss so far, valued at the last close, after costs."} /></>,
-        meta: { right: true },
+        meta: { right: true, label: "Return" },
         sortUndefined: "last",
         accessorFn: (i) => i.outcome?.return_pct ?? undefined,
         cell: ({ row }) => <Num value={row.original.outcome?.return_pct} kind="pct" colored />,
@@ -232,7 +236,7 @@ function LoggedIdeas({ screens }: { screens: SignalGroup[] }) {
       {
         id: "r",
         header: () => <>R<Explain text={COLUMNS[4][1].replace("Average result", "Result")} /></>,
-        meta: { right: true },
+        meta: { right: true, label: "R" },
         sortUndefined: "last",
         accessorFn: (i) => i.outcome?.r_multiple ?? undefined,
         cell: ({ row }) => <R value={row.original.outcome?.r_multiple} />,
@@ -274,7 +278,7 @@ function LoggedIdeas({ screens }: { screens: SignalGroup[] }) {
       </div>
 
       <div className="flex flex-wrap items-center gap-3 py-3">
-        <label className="relative">
+        <label className="relative w-full md:w-auto">
           <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" aria-hidden />
           <Input
             id="idea-search"
@@ -283,7 +287,7 @@ function LoggedIdeas({ screens }: { screens: SignalGroup[] }) {
             onChange={(e) => setQInput(e.target.value)}
             placeholder="Find a stock, e.g. TCS"
             aria-label="Find a stock"
-            className="w-64 pl-8"
+            className="w-full pl-8 md:w-64"
           />
         </label>
         <label className="flex items-center gap-2 text-muted-foreground">
@@ -321,14 +325,16 @@ function LoggedIdeas({ screens }: { screens: SignalGroup[] }) {
         <span className="text-xs text-muted-foreground">{data ? `${total} idea${total === 1 ? "" : "s"} in this view` : ""}</span>
       </div>
 
-      <div className="grid grid-cols-[minmax(0,1fr)_360px] items-start gap-4">
+      <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-[minmax(0,1fr)_360px]">
         <div className="min-w-0">
           <DataTable
             columns={columns}
             data={rows}
             loading={!data}
             getRowId={(i) => String(i.id)}
-            onRowClick={(i) => setSelId(i.id)}
+            onRowClick={(i) => setSelId((cur) => (phone && cur === i.id ? null : i.id))}
+            expandedRowId={phone && selId != null ? String(selId) : null}
+            renderExpanded={(i) => <IdeaPanel idea={i} />}
             rowClassName={(i) => (i.id === selId ? "bg-accent/10 shadow-[inset_3px_0_0_var(--accent)] hover:bg-accent/10" : undefined)}
             emptyTitle="No ideas match these filters. Try a longer date range or clear the search."
           />
@@ -345,15 +351,56 @@ function LoggedIdeas({ screens }: { screens: SignalGroup[] }) {
             </span>
           </div>
         </div>
-        <aside className="sticky top-4 rounded-card border border-border p-4" aria-live="polite">
-          <IdeaPanel idea={selected} />
-        </aside>
+        {!phone && (
+          <aside className="sticky top-4 rounded-card border border-border p-4" aria-live="polite">
+            <IdeaPanel idea={selected} />
+          </aside>
+        )}
       </div>
     </Card>
   );
 }
 
+/** Phone: one block per group, its metrics as a 2-column grid of small cards. */
+function GroupCards({ groups }: { groups: SignalGroup[] }) {
+  return (
+    <div className="flex flex-col gap-4">
+      {groups.map((g) => {
+        const metrics: [string, string, ReactNode][] = [
+          ["Closed", COLUMNS[0][1], <span className="num">{g.n_closed}</span>],
+          ["Still open", COLUMNS[1][1], <span className="num">{g.n_open}</span>],
+          ["Win rate", COLUMNS[2][1], <Num value={g.hit_rate_pct} kind="pct" digits={0} />],
+          ["Avg return", COLUMNS[3][1], <Num value={g.avg_return_pct} kind="pct" colored />],
+          ["Avg R", COLUMNS[4][1], <R value={g.avg_r} />],
+          ["Beat Nifty by", COLUMNS[5][1], <Num value={g.avg_excess_pct} kind="pct" colored />],
+          ["Avg days", COLUMNS[6][1], <Num value={g.avg_days} digits={1} />],
+        ];
+        return (
+          <section key={g.key} data-testid="group-block" className={cn(!g.enough && "opacity-80")}>
+            <h4 className="m-0 mb-2 text-sm font-semibold">
+              {g.label}
+              {!g.enough && <TooEarly />}
+            </h4>
+            <div className="grid grid-cols-2 gap-2">
+              {metrics.map(([label, help, value]) => (
+                <Card key={label} className="flex flex-col gap-0.5 p-2.5">
+                  <div className="text-xs text-muted-foreground">
+                    {label}
+                    <Explain text={help} />
+                  </div>
+                  <div className="text-base font-semibold">{value}</div>
+                </Card>
+              ))}
+            </div>
+          </section>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function TrackRecord() {
+  const phone = useIsPhone();
   const [summary, setSummary] = useState<SignalsSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -418,12 +465,16 @@ export default function TrackRecord() {
 
           <Card className="mb-4">
             <CardHeader><CardTitle>How the ideas did</CardTitle></CardHeader>
-            <DataTable
-              columns={groupCols}
-              data={summary.groups}
-              getRowId={(g) => g.key}
-              rowClassName={(g) => (g.enough ? undefined : "opacity-55")}
-            />
+            {phone ? (
+              <GroupCards groups={summary.groups} />
+            ) : (
+              <DataTable
+                columns={groupCols}
+                data={summary.groups}
+                getRowId={(g) => g.key}
+                rowClassName={(g) => (g.enough ? undefined : "opacity-55")}
+              />
+            )}
             <p className="mb-0 mt-2 text-xs text-muted-foreground">
               {summary.n_signals} loggings grouped into {summary.n_ideas} ideas
               <Explain text={GROUPED} />

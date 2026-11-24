@@ -15,6 +15,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/toaster";
+import { useIsPhone } from "@/lib/useIsPhone";
 
 function Stat({ label, children, help }: { label: string; children: React.ReactNode; help?: string }) {
   return (
@@ -51,9 +52,9 @@ function EditRow({ p, onDone }: { p: Position; onDone: (p: Position) => void }) 
     }
   };
   return (
-    <span className="inline-flex items-center gap-1">
-      <Input className="w-24" aria-label="Stop" type="number" step="any" value={stop} onChange={(e) => setStop(e.target.value)} />
-      <Input className="w-24" aria-label="Target" type="number" step="any" value={target} onChange={(e) => setTarget(e.target.value)} />
+    <span className="inline-flex flex-wrap items-center gap-1">
+      <Input className="w-24" aria-label="Stop" type="number" inputMode="decimal" step="any" value={stop} onChange={(e) => setStop(e.target.value)} />
+      <Input className="w-24" aria-label="Target" type="number" inputMode="decimal" step="any" value={target} onChange={(e) => setTarget(e.target.value)} />
       <Button size="sm" onClick={() => void save()}>Save</Button>
       <Button variant="ghost" size="sm" onClick={() => onDone(p)}>Cancel</Button>
       {err && <span className="neg">{err}</span>}
@@ -66,6 +67,7 @@ export default function Portfolio() {
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<number | null>(null);
   const [closing, setClosing] = useState<Position | null>(null);
+  const phone = useIsPhone();
 
   const load = useCallback(async () => {
     try {
@@ -84,6 +86,7 @@ export default function Portfolio() {
       {
         accessorKey: "symbol",
         header: "Stock",
+        meta: { phone: "title" },
         cell: ({ row }) => (
           <span className="inline-flex flex-wrap items-center gap-2">
             <Link to={`/stock/${row.original.symbol}`} className="font-mono">{row.original.symbol}</Link>
@@ -91,8 +94,18 @@ export default function Portfolio() {
           </span>
         ),
       },
-      { accessorKey: "qty", header: "Qty", meta: { right: true }, cell: ({ row }) => <span className="num">{row.original.qty}</span> },
-      { accessorKey: "entry_price", header: "Entry", meta: { right: true }, cell: ({ row }) => <Num value={row.original.entry_price} kind="inr" digits={2} /> },
+      { accessorKey: "qty", header: "Qty", meta: { right: true, phone: "hide" }, cell: ({ row }) => <span className="num">{row.original.qty}</span> },
+      {
+        accessorKey: "entry_price",
+        header: phone ? "Qty × avg price" : "Entry",
+        meta: { right: true },
+        cell: ({ row }) =>
+          phone ? (
+            <span className="num">{row.original.qty} × <Num value={row.original.entry_price} kind="inr" digits={2} /></span>
+          ) : (
+            <Num value={row.original.entry_price} kind="inr" digits={2} />
+          ),
+      },
       { accessorKey: "last_close", header: "Last", meta: { right: true }, sortUndefined: "last", cell: ({ row }) => <Num value={row.original.last_close} kind="inr" digits={2} /> },
       {
         accessorKey: "pnl_inr",
@@ -113,7 +126,7 @@ export default function Portfolio() {
             <Explain text="Profit measured in units of the risk you took. +2R = twice what you risked." />
           </>
         ),
-        meta: { right: true },
+        meta: { right: true, label: "R multiple" },
         sortUndefined: "last",
         cell: ({ row }) => (row.original.r_multiple === null ? "—" : <Num value={row.original.r_multiple} kind="plain" digits={1} colored />),
       },
@@ -150,15 +163,16 @@ export default function Portfolio() {
         id: "actions",
         header: "",
         enableSorting: false,
+        meta: { phone: "subtitle" },
         cell: ({ row }) => (
-          <span className="flex gap-1">
-            <Button variant="outline" size="sm" onClick={() => setEditing(row.original.id)}>Edit stop/target</Button>
-            <Button variant="outline" size="sm" onClick={() => setClosing(row.original)}>Close…</Button>
+          <span className="mt-1 flex flex-wrap gap-1">
+            <Button variant="outline" size="sm" className={phone ? "min-h-10" : undefined} onClick={() => setEditing(row.original.id)}>Edit stop/target</Button>
+            <Button variant="outline" size="sm" className={phone ? "min-h-10" : undefined} onClick={() => setClosing(row.original)}>Close…</Button>
           </span>
         ),
       },
     ],
-    [editing],
+    [editing, phone],
   );
 
   if (error) return <p className="neg">{error}</p>;
@@ -166,7 +180,7 @@ export default function Portfolio() {
     return (
       <div>
         <h1>Portfolio</h1>
-        <div className="mb-4 grid grid-cols-4 gap-3">{[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-[72px]" />)}</div>
+        <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">{[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-[72px]" />)}</div>
         <Skeleton className="h-48" />
       </div>
     );
@@ -187,16 +201,36 @@ export default function Portfolio() {
   return (
     <div>
       <h1>Portfolio</h1>
-      <div className="mb-4 grid grid-cols-4 gap-3">
-        <Stat label="Capital invested"><Num value={invested} kind="inr" /></Stat>
-        <Stat label="Current value"><Num value={value} kind="inr" /></Stat>
-        <Stat label="Unrealised profit / loss">
-          <Num value={pnl} kind="inr" colored /> <Num value={invested ? (pnl / invested) * 100 : 0} kind="pct" colored />
-        </Stat>
-        <Stat label="Total open risk" help="Rupees you would lose if every stop-loss is hit, measured from your entry prices.">
-          <Num value={risk} kind="inr" />
-        </Stat>
-      </div>
+      {phone ? (
+        <Card className="mb-3 flex flex-col gap-2 p-3" aria-label="Portfolio summary">
+          <div>
+            <div className="text-xs text-muted-foreground">Current value</div>
+            <div className="text-2xl font-semibold"><Num value={value} kind="inr" /></div>
+          </div>
+          <dl className="m-0 grid grid-cols-2 gap-x-3 gap-y-1 text-sm">
+            <dt className="text-muted-foreground">Unrealised profit / loss</dt>
+            <dd className="m-0 text-right"><Num value={pnl} kind="inr" colored /> <Num value={invested ? (pnl / invested) * 100 : 0} kind="pct" colored /></dd>
+            <dt className="text-muted-foreground">Capital invested</dt>
+            <dd className="m-0 text-right"><Num value={invested} kind="inr" /></dd>
+            <dt className="text-muted-foreground">
+              Total open risk
+              <Explain text="Rupees you would lose if every stop-loss is hit, measured from your entry prices." />
+            </dt>
+            <dd className="m-0 text-right"><Num value={risk} kind="inr" /></dd>
+          </dl>
+        </Card>
+      ) : (
+        <div className="mb-4 grid grid-cols-4 gap-3">
+          <Stat label="Capital invested"><Num value={invested} kind="inr" /></Stat>
+          <Stat label="Current value"><Num value={value} kind="inr" /></Stat>
+          <Stat label="Unrealised profit / loss">
+            <Num value={pnl} kind="inr" colored /> <Num value={invested ? (pnl / invested) * 100 : 0} kind="pct" colored />
+          </Stat>
+          <Stat label="Total open risk" help="Rupees you would lose if every stop-loss is hit, measured from your entry prices.">
+            <Num value={risk} kind="inr" />
+          </Stat>
+        </div>
+      )}
       <DataTable columns={columns} data={rows} getRowId={(r) => String(r.id)} showDensityToggle />
       {closing && (
         <ExitChecklist

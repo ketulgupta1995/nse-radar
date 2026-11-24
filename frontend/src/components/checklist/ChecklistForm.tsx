@@ -55,7 +55,7 @@ export default function ChecklistForm({ questions, values, onChange }: Props) {
               <textarea rows={2} value={(v as string) ?? ""} onChange={(e) => onChange(q.id, e.target.value)} />
             )}
             {q.type === "number" && (
-              <input type="number" step="any" value={(v as string) ?? ""} onChange={(e) => onChange(q.id, e.target.value)} />
+              <input type="number" inputMode="decimal" step="any" value={(v as string) ?? ""} onChange={(e) => onChange(q.id, e.target.value)} />
             )}
             {q.type === "choice" && (
               <select value={(v as string) ?? ""} onChange={(e) => onChange(q.id, e.target.value)}>
