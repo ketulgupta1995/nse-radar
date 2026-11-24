@@ -27,7 +27,7 @@ Status values: `todo` · `done` · `blocked` (add a reason).
 | N010 | AI by copy-prompt in the cloud | N007 | sonnet | todo |
 | N011 | Weekly encrypted backup from the cloud worker | N006 | sonnet | todo |
 | N012 | Phone shell: top bar, bottom tabs, More sheet, search | — | sonnet | done |
-| N013 | DataTable shows rows as cards on a phone | N012 | sonnet | todo |
+| N013 | DataTable shows rows as cards on a phone | N012 | sonnet | done |
 | N014 | Dashboard, Alerts and Watchlist on a phone | N013 | sonnet | todo |
 | N015 | Stock page on a phone | N013 | sonnet | todo |
 | N016 | Screener and rule builder on a phone | N013 | sonnet | todo |
