@@ -19,7 +19,7 @@ Status values: `todo` · `done` · `blocked` (add a reason).
 | N002 | Runtime modes and the Turso driver behind `db.connect()` | N001 | sonnet | done |
 | N003 | Seed script and the owner's setup guide | N002 | sonnet | done |
 | N004 | Thread-free job drain | N002 | sonnet | done |
-| N005 | Kick the cloud worker, keep-alive, `/api/cloud/status` | N004 | sonnet | todo |
+| N005 | Kick the cloud worker, keep-alive, `/api/cloud/status` | N004 | sonnet | done |
 | N006 | GitHub Actions workflows: ci, drain, daily | N005 | sonnet | todo |
 | N007 | Vercel entry point and config | N004 | sonnet | todo |
 | N008 | Password gate | N007 | sonnet | todo |

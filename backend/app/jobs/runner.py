@@ -6,7 +6,8 @@ import time
 import traceback
 from datetime import datetime
 
-from app import db, timeutil
+from app import config, db, timeutil
+from app.cloud import dispatch
 from app.jobs import registry
 from app.jobs.context import MAX_MSG, JobContext, StopRequested
 
@@ -38,6 +39,8 @@ def enqueue(
             "VALUES (?,?,?,'queued',?,?)",
             (job, pj, trigger, timeutil.now_iso(), retry_of),
         )
+        if config.RUNTIME == "vercel":  # no worker here: start the cloud drain (SPEC §17.4)
+            db.after_commit(lambda: dispatch.kick(f"enqueue {job}"))
         return int(cur.lastrowid)
 
 

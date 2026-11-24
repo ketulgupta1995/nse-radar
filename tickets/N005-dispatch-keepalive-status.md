@@ -14,3 +14,6 @@ SPEC §17.4, §17.2, §6, `backend/app/jobs/runner.py` (`enqueue`), `backend/app
 - Tests: `backend/tests/test_dispatch.py` (new): kick posts the right URL/body/headers; debounce within 60 s; a failure returns False and the job stays queued; keepalive at most once every 7 days; enqueue in vercel mode kicks after commit and in local mode doesn't; the status shape.
 
 ## Notes for the planner
+- SPEC §17.4 says keep-alive runs "on any `/api/jobs/status` call"; this ticket says `/api/cloud/status`. Implemented the ticket (only `/api/cloud/status` calls `keepalive()`). Update the SPEC line, or make sure N019's Cloud panel polls `/api/cloud/status` so keep-alive actually fires.
+- `kick()` returns True when debounced (a dispatch went out < 60 s ago), False when not configured or when GitHub/network fails. `last_dispatch_at` is recorded only on success, so a failed kick is retried by the next enqueue. `last_keepalive_at` is recorded on every attempt, so a failing keep-alive doesn't hit GitHub on every status poll.
+- Added `dispatch.configured()` and `dispatch.last_dispatch_at()` helpers (used by the status route).
