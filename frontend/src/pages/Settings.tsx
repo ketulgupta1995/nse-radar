@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { ApiError, api } from "../api/client";
-import type { AiStatus, CostModel, CustomIndicator, Feed, Settings as S } from "../api/types";
+import { ApiError, api, browser } from "../api/client";
+import type { AiStatus, CostModel, CustomIndicator, Feed, Me, Settings as S } from "../api/types";
 import Explain from "../components/Explain";
 import CustomIndicatorReview from "../components/screens/CustomIndicatorReview";
 import SettingsSection from "../components/SettingsSection";
@@ -54,6 +54,7 @@ export default function Settings() {
   const [indicators, setIndicators] = useState<CustomIndicator[]>([]);
   const [reviewing, setReviewing] = useState<CustomIndicator | null>(null);
   const [indError, setIndError] = useState<string | null>(null);
+  const [authRequired, setAuthRequired] = useState(false);
 
   const loadIndicators = useCallback(() => {
     api
@@ -83,7 +84,17 @@ export default function Settings() {
       .get<AiStatus>("/ai/status")
       .then(setAi)
       .catch(() => setAi("missing"));
+    api
+      .get<Me>("/me")
+      .then((m) => setAuthRequired(m.auth_required))
+      .catch(() => setAuthRequired(false));
   }, [load, loadIndicators]);
+
+  const logout = () =>
+    api
+      .post("/logout")
+      .catch(() => undefined)
+      .then(() => browser.go("/login"));
 
   if (error) return <p className="neg">{error}</p>;
   if (!s) return <p className="muted">Loading…</p>;
@@ -252,6 +263,16 @@ export default function Settings() {
         </Button>
         {backup && <p role="status">{backup}</p>}
       </section>
+
+      {authRequired && (
+        <section className="card settings-section">
+          <h2>Account</h2>
+          <p className="muted">Logs this browser out. You will need the password to get back in.</p>
+          <Button variant="outline" size="sm" type="button" onClick={() => void logout()}>
+            Log out
+          </Button>
+        </section>
+      )}
     </div>
   );
 }

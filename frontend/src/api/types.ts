@@ -249,6 +249,12 @@ export interface AiStatus {
   providers: { name: string; label: string }[];
 }
 
+/** GET /api/me (password gate, SPEC §17.5). */
+export interface Me {
+  auth_required: boolean;
+  logged_in: boolean;
+}
+
 export interface PriceBar {
   t: string;
   o: number;

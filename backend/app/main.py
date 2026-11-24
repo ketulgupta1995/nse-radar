@@ -8,6 +8,7 @@ from fastapi.responses import FileResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 
 from app import bootstrap, config, db
+from app.cloud import auth
 from app.jobs import runner, scheduler
 from app.plugins import import_all
 
@@ -32,6 +33,7 @@ async def lifespan(_app: FastAPI):
 
 
 app = FastAPI(title="stock-tools", lifespan=lifespan)
+auth.install(app)
 
 for _mod in import_all("app.api"):
     _router = getattr(_mod, "router", None)

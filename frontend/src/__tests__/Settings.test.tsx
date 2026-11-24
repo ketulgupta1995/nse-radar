@@ -71,3 +71,17 @@ test("trend-exit inputs render and save", async () => {
   await waitFor(() => expect(put).toHaveBeenCalled());
   expect(put.mock.calls[0][1]).toMatchObject({ position_exit_sma: 50, trail_atr_multiple: 0 });
 });
+
+test("log out button shows only when the password gate is on", async () => {
+  const me = { auth_required: false, logged_in: true };
+  vi.spyOn(api, "get").mockImplementation((path: string) =>
+    path === "/settings" ? Promise.resolve(settings) : path === "/me" ? Promise.resolve(me) : Promise.reject(new ApiError(404, "nope")),
+  );
+  render(<MemoryRouter><Settings /></MemoryRouter>);
+  await waitFor(() => expect(screen.getByText("Money & risk")).toBeTruthy());
+  expect(screen.queryByText("Log out")).toBeNull();
+  cleanup();
+  me.auth_required = true;
+  render(<MemoryRouter><Settings /></MemoryRouter>);
+  await waitFor(() => expect(screen.getByText("Log out")).toBeTruthy());
+});

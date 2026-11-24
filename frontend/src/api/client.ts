@@ -31,9 +31,20 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
     } else if (typeof data === "string" && data) {
       message = data;
     }
+    if (res.status === 401 && message === "login required") goToLogin();
     throw new ApiError(res.status, message);
   }
   return data as T;
+}
+
+/** Full-page navigation; an object so tests can spy on it (jsdom's location can't be replaced). */
+export const browser = { go: (url: string): void => window.location.assign(url) };
+
+/** Send the browser to the login page, remembering where it was going (SPEC §17.5). */
+function goToLogin(): void {
+  const { pathname, search } = window.location;
+  if (pathname === "/login") return;
+  browser.go(`/login?next=${encodeURIComponent(pathname + search)}`);
 }
 
 export const api = {
