@@ -1,4 +1,5 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { setPhone } from "./phone";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 
@@ -133,4 +134,32 @@ test("badge says there is nothing new when the count is zero", async () => {
   st.alerts = [];
   render(<MemoryRouter><AlertBadge /></MemoryRouter>);
   expect(await screen.findByLabelText("No new alerts")).toBeTruthy();
+});
+
+// ---- Phone (N014) ----
+
+test("phone: cards show the alert text first, then symbol and time, with a visible Mark seen button", async () => {
+  vi.stubGlobal("ResizeObserver", class { observe() {} unobserve() {} disconnect() {} });
+  setPhone(true);
+  const { container } = page();
+  const msg = await screen.findByText("Alert 1");
+  const card = msg.closest("[data-testid=phone-card]") as HTMLElement;
+  expect(card).toBeTruthy();
+  const sub = within(card).getByText(/5 min ago · Stop price reached/);
+  expect(msg.compareDocumentPosition(sub) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(sub.textContent).toMatch(/^TCS · 5 min ago/);
+  fireEvent.click(within(card).getByRole("button", { name: "Mark seen: Alert 1" }));
+  await waitFor(() => expect(screen.queryByText("Alert 1")).toBeNull());
+  expect(st.calls.find((c) => c.url === "/api/alerts/seen")?.body).toEqual({ ids: [1] });
+  expect(screen.queryByTestId("where")).toBeNull();
+  expect([...container.innerHTML.matchAll(/min-w-\[(\d+)px\]/g)].filter((m) => Number(m[1]) > 360)).toEqual([]);
+});
+
+test("phone: tapping a card marks it seen and opens its link", async () => {
+  vi.stubGlobal("ResizeObserver", class { observe() {} unobserve() {} disconnect() {} });
+  setPhone(true);
+  page();
+  fireEvent.click(await screen.findByText("Alert 2"));
+  await waitFor(() => expect(screen.getByTestId("where").textContent).toBe("/stock/AAA"));
+  expect(st.alerts.find((a) => a.id === 2)?.seen_at).toBeTruthy();
 });

@@ -1,6 +1,7 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import { setPhone } from "./phone";
 
 import { api } from "../api/client";
 import type { Dashboard as DashboardData, DashboardSince } from "../api/types";
@@ -126,4 +127,72 @@ test("dismissing the since banner hides it and is remembered for that visit", ()
   cleanup();
   render(<MemoryRouter><SinceStrip since={{ ...s, last_visit_at: "2026-11-09T18:00:00+05:30" }} /></MemoryRouter>);
   expect(screen.getByText("Since you were away")).toBeTruthy();
+});
+
+// ---- Phone (N014) ----
+
+function noWideMinWidth(html: string) {
+  const widths = [...html.matchAll(/min-w-\[(\d+)px\]/g)].map((m) => Number(m[1]));
+  expect(widths.filter((w) => w > 360)).toEqual([]);
+}
+const before = (a: Element, b: Element) => !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+
+test("phone: sections stack in order and Refresh is an icon button in the header", async () => {
+  setPhone(true);
+  const post = mockApi(dash({ since: since({ positions: [{ symbol: "AAA", change_pct_since_visit: -3 }] }) }));
+  const { container } = page();
+  await screen.findByText("Aaa Ltd");
+  expect(screen.getByTestId("dashboard-phone")).toBeTruthy();
+  const order = [
+    screen.getByText("Since you were away"),
+    screen.getByText(/Today's shortlist/),
+    screen.getByText("Needs attention"),
+    screen.getByText("My positions"),
+    screen.getByText("Data freshness"),
+  ];
+  for (let i = 1; i < order.length; i++) expect(before(order[i - 1], order[i])).toBe(true);
+  expect(screen.queryByText("Portfolio value")).toBeNull();
+  const refresh = screen.getByRole("button", { name: "Refresh now" });
+  expect(refresh.textContent).toBe("");
+  fireEvent.click(refresh);
+  await waitFor(() => expect(post).toHaveBeenCalledWith("/jobs/refresh"));
+  noWideMinWidth(container.innerHTML);
+});
+
+test("phone: shortlist card shows symbol, company, score and top 2 reasons; +N more expands; tap opens the stock", async () => {
+  setPhone(true);
+  mockApi(dash({
+    shortlist: [{ symbol: "AAA", name: "Aaa Ltd", score: 81.4, components: { rs: 90 },
+      reasons: ["ROCE 22%", "Near high", "Low debt"], screens: ["Uptrend leaders"], last_close: 100 }],
+  }));
+  render(
+    <MemoryRouter>
+      <Routes>
+        <Route path="/" element={<Dashboard />} />
+        <Route path="/stock/:sym" element={<p>stock page</p>} />
+      </Routes>
+    </MemoryRouter>,
+  );
+  const card = (await screen.findByText("Aaa Ltd")).closest("[data-testid=phone-card]") as HTMLElement;
+  expect(within(card).getByText("AAA")).toBeTruthy();
+  expect(within(card).getByLabelText("Score 81 out of 100")).toBeTruthy();
+  expect(within(card).getByText("ROCE 22%")).toBeTruthy();
+  expect(within(card).getByText("Near high")).toBeTruthy();
+  expect(within(card).queryByText("Low debt")).toBeNull();
+  fireEvent.click(within(card).getByText("+2 more"));
+  expect(within(card).getByText("Low debt")).toBeTruthy();
+  expect(within(card).getByText("Uptrend leaders")).toBeTruthy();
+  expect(screen.queryByText("stock page")).toBeNull();
+  fireEvent.click(card);
+  expect(await screen.findByText("stock page")).toBeTruthy();
+});
+
+test("laptop keeps the KPI strip and the text Refresh button", async () => {
+  setPhone(false);
+  mockApi(dash());
+  page();
+  await screen.findByText("AAA");
+  expect(screen.queryByTestId("dashboard-phone")).toBeNull();
+  expect(screen.getByText("Portfolio value")).toBeTruthy();
+  expect(screen.getByText("Refresh now")).toBeTruthy();
 });

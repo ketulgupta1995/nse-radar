@@ -1,5 +1,5 @@
 import type { ColumnDef } from "@tanstack/react-table";
-import { X } from "lucide-react";
+import { ChevronDown, ChevronUp, RefreshCw, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ApiError, api } from "../api/client";
@@ -15,6 +15,7 @@ import { DataTable } from "@/components/ui/data-table";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDay } from "../lib/dates";
+import { useIsPhone } from "../lib/useIsPhone";
 
 const POLL_MS = 5_000;
 const msg = (e: unknown) => (e instanceof ApiError ? e.message : String(e));
@@ -53,7 +54,7 @@ export function SinceStrip({ since }: { since: DashboardSince | null }) {
   };
   return (
     <section className="mb-4 flex items-start justify-between gap-3 rounded-card border border-accent bg-card px-4 py-2.5" aria-label="Since you were away">
-      <div>
+      <div className="min-w-0 break-words">
       <strong>Since you were away</strong> <span className="muted">(since {since.last_visit_at.slice(0, 16).replace("T", " ")})</span>
       <div>
         {since.alerts.length > 0 && (
@@ -117,8 +118,72 @@ function breakdownOf(item: ShortlistItem): string {
     .join(" · ");
 }
 
+function ScoreCell({ item }: { item: ShortlistItem }) {
+  const breakdown = breakdownOf(item);
+  return (
+    <span title={breakdown}>
+      <span className="score-bar" aria-label={`Score ${item.score.toFixed(0)} out of 100`}>
+        <span style={{ width: `${Math.max(0, Math.min(100, item.score))}%` }} />
+      </span>{" "}
+      <span className="num">{item.score.toFixed(0)}</span>
+      <Explain text={`Score out of 100 against the other candidates. ${breakdown}`} />
+    </span>
+  );
+}
+
+/** Phone: the top 2 reasons; the rest (and the screens) open with "+N more". */
+export function TopReasons({ item }: { item: ShortlistItem }) {
+  const [open, setOpen] = useState(false);
+  const all = [
+    ...item.reasons.map((text) => ({ text, screen: false })),
+    ...item.screens.map((text) => ({ text, screen: true })),
+  ];
+  const shown = open ? all : all.slice(0, 2);
+  const extra = all.length - 2;
+  return (
+    <div className="flex flex-wrap items-center gap-1">
+      {shown.map((r) => (
+        <span key={`${r.screen ? "s" : "r"}-${r.text}`} className={r.screen ? "chip screen" : "chip"}>{r.text}</span>
+      ))}
+      {extra > 0 && (
+        <button
+          type="button"
+          aria-expanded={open}
+          onClick={(e) => {
+            e.stopPropagation();
+            setOpen((o) => !o);
+          }}
+          className="inline-flex min-h-10 cursor-pointer items-center gap-1 border-0 bg-transparent p-0 text-xs text-accent"
+        >
+          {open ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+          {open ? "Less" : `+${extra} more`}
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** Phone cards: symbol title, company subtitle, then score bar and top reasons. */
+const PHONE_SHORTLIST_COLUMNS: ColumnDef<ShortlistItem>[] = [
+  {
+    accessorKey: "symbol",
+    header: "Stock",
+    meta: { phone: "title" },
+    cell: ({ row }) => (
+      <span className="flex flex-wrap items-center gap-2">
+        <strong className="font-mono">{row.original.symbol}</strong>
+        <ResultsBadge next={row.original.next_results} />
+      </span>
+    ),
+  },
+  { accessorKey: "name", header: "Company", meta: { phone: "subtitle" }, cell: ({ row }) => row.original.name ?? "" },
+  { accessorKey: "score", header: "Score", cell: ({ row }) => <ScoreCell item={row.original} /> },
+  { id: "why", header: "Why it is here", enableSorting: false, cell: ({ row }) => <TopReasons item={row.original} /> },
+];
+
 export function ShortlistTable({ items, loading }: { items: ShortlistItem[]; loading: boolean }) {
   const nav = useNavigate();
+  const phone = useIsPhone();
   const columns = useMemo<ColumnDef<ShortlistItem>[]>(
     () => [
       { id: "rank", header: "#", enableSorting: false, cell: ({ row }) => <span className="muted">{row.index + 1}</span> },
@@ -139,19 +204,7 @@ export function ShortlistTable({ items, loading }: { items: ShortlistItem[]; loa
         accessorKey: "score",
         header: "Score",
         meta: { right: true },
-        cell: ({ row }) => {
-          const it = row.original;
-          const breakdown = breakdownOf(it);
-          return (
-            <span title={breakdown}>
-              <span className="score-bar" aria-label={`Score ${it.score.toFixed(0)} out of 100`}>
-                <span style={{ width: `${Math.max(0, Math.min(100, it.score))}%` }} />
-              </span>{" "}
-              <span className="num">{it.score.toFixed(0)}</span>
-              <Explain text={`Score out of 100 against the other candidates. ${breakdown}`} />
-            </span>
-          );
-        },
+        cell: ({ row }) => <ScoreCell item={row.original} />,
       },
       {
         id: "why",
@@ -169,7 +222,7 @@ export function ShortlistTable({ items, loading }: { items: ShortlistItem[]; loa
   );
   return (
     <DataTable
-      columns={columns}
+      columns={phone ? PHONE_SHORTLIST_COLUMNS : columns}
       data={items}
       loading={loading}
       showDensityToggle
@@ -226,7 +279,7 @@ export function KpiStrip({ data }: { data: DashboardData | null }) {
 export function AlertList({ alerts }: { alerts: Alert[] }) {
   if (alerts.length === 0) return <EmptyState title="Nothing needs your attention." />;
   return (
-    <ul>
+    <ul className="break-words">
       {alerts.map((a) => (
         <li key={a.id} className={a.severity === "critical" ? "neg" : undefined}>
           {a.link ? <Link to={a.link}>{a.message}</Link> : a.message}
@@ -236,7 +289,68 @@ export function AlertList({ alerts }: { alerts: Alert[] }) {
   );
 }
 
+function PositionsSummary({ data, cols }: { data: DashboardData | null; cols: string }) {
+  return (
+    <Card className="mb-4">
+      <CardHeader><CardTitle>My positions</CardTitle></CardHeader>
+      {data ? (
+        <div className={`grid ${cols} gap-3`}>
+          <Kpi label="Open positions"><Num value={data.positions.open} /></Kpi>
+          <Kpi label="Money invested"><Num value={data.positions.invested} kind="inr" /></Kpi>
+          <Kpi label="Profit or loss so far">
+            <Num value={data.positions.pnl} kind="inr" colored />{" "}
+            <Num value={data.positions.pnl_pct} kind="pct" colored />
+          </Kpi>
+          <Kpi label="Money at risk" hint="What you would lose if every open position hit its stop-loss.">
+            <Num value={data.positions.open_risk} kind="inr" />
+          </Kpi>
+        </div>
+      ) : (
+        <Skeleton className="h-16" />
+      )}
+      <p><Link to="/positions">Go to Portfolio</Link></p>
+    </Card>
+  );
+}
+
+function AttentionCard({ data, className }: { data: DashboardData | null; className?: string }) {
+  return (
+    <Card className={className}>
+      <CardHeader><CardTitle>Needs attention</CardTitle></CardHeader>
+      {data ? <AlertList alerts={data.alerts} /> : <Skeleton className="h-16" />}
+      <p><Link to="/alerts">All alerts</Link></p>
+    </Card>
+  );
+}
+
+function ShortlistCard({ data, updating, className }: { data: DashboardData | null; updating: boolean; className?: string }) {
+  return (
+    <Card className={className}>
+      <CardHeader><CardTitle>Today's shortlist{updating ? " (updating…)" : ""}</CardTitle></CardHeader>
+      <p className="disclaimer">Ideas to research, not advice. Use the checklist before any trade.</p>
+      <ShortlistTable items={data?.shortlist ?? []} loading={!data} />
+    </Card>
+  );
+}
+
+/** Prices date, "Updating…" and open price checks. */
+function FreshnessLine({ data, updating }: { data: DashboardData | null; updating: boolean }) {
+  return (
+    <>
+      <span className={data?.data.stale ? "stale" : undefined}>
+        Prices up to {formatDay(data?.data.last_trading_date)}
+        {data?.data.stale ? " (out of date)" : ""}
+      </span>
+      {updating && <span role="status">Updating…</span>}
+      {!!data?.data.checks_open && (
+        <Link to="/jobs">{data.data.checks_open} price check{data.data.checks_open === 1 ? "" : "s"} need a look</Link>
+      )}
+    </>
+  );
+}
+
 export default function Dashboard() {
+  const phone = useIsPhone();
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -309,59 +423,55 @@ export default function Dashboard() {
     }
   };
 
+  const firstRun = (
+    <FirstRunPanel reloadKey={reloadKey} onStarted={() => { setRefreshing(true); notifyStatusChanged(); }} />
+  );
+
+  if (phone) {
+    return (
+      <div className="dashboard flex min-w-0 flex-col" data-testid="dashboard-phone">
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <h1 className="m-0">Dashboard</h1>
+          <Button variant="outline" size="icon" className="h-10 w-10" aria-label="Refresh now" title="Refresh now" onClick={refresh} disabled={refreshing}>
+            <RefreshCw size={18} className={updating ? "animate-spin" : undefined} />
+          </Button>
+        </div>
+        {error && <p className="neg" role="alert">{error}</p>}
+        {firstRun}
+        {data && <SinceStrip since={data.since} />}
+        <ShortlistCard data={data} updating={updating} className="mb-4" />
+        <AttentionCard data={data} className="mb-4" />
+        <PositionsSummary data={data} cols="grid-cols-2" />
+        <Card className="mb-4">
+          <CardHeader><CardTitle>Data freshness</CardTitle></CardHeader>
+          <div className="flex flex-col gap-1">
+            <FreshnessLine data={data} updating={updating} />
+            <span className="text-xs text-muted-foreground">{health}</span>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="dashboard">
       <h1>Dashboard</h1>
       {error && <p className="neg" role="alert">{error}</p>}
-      <FirstRunPanel reloadKey={reloadKey} onStarted={() => { setRefreshing(true); notifyStatusChanged(); }} />
+      {firstRun}
       {data && <SinceStrip since={data.since} />}
       <div className="mb-4 flex flex-wrap items-center gap-x-6 gap-y-2">
-        <span className={data?.data.stale ? "stale" : undefined}>
-          Prices up to {formatDay(data?.data.last_trading_date)}
-          {data?.data.stale ? " (out of date)" : ""}
-        </span>
-        {updating && <span role="status">Updating…</span>}
-        {!!data?.data.checks_open && (
-          <Link to="/jobs">{data.data.checks_open} price check{data.data.checks_open === 1 ? "" : "s"} need a look</Link>
-        )}
+        <FreshnessLine data={data} updating={updating} />
         <Button variant="outline" onClick={refresh} disabled={refreshing}>Refresh now</Button>
       </div>
 
       <KpiStrip data={data} />
 
       <div className="mb-4 grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] items-start gap-4">
-        <Card>
-          <CardHeader><CardTitle>Needs attention</CardTitle></CardHeader>
-          {data ? <AlertList alerts={data.alerts} /> : <Skeleton className="h-16" />}
-          <p><Link to="/alerts">All alerts</Link></p>
-        </Card>
-
-        <Card>
-          <CardHeader><CardTitle>Today's shortlist{updating ? " (updating…)" : ""}</CardTitle></CardHeader>
-          <p className="disclaimer">Ideas to research, not advice. Use the checklist before any trade.</p>
-          <ShortlistTable items={data?.shortlist ?? []} loading={!data} />
-        </Card>
+        <AttentionCard data={data} />
+        <ShortlistCard data={data} updating={updating} />
       </div>
 
-      <Card className="mb-4">
-        <CardHeader><CardTitle>My positions</CardTitle></CardHeader>
-        {data ? (
-          <div className="grid grid-cols-4 gap-3">
-            <Kpi label="Open positions"><Num value={data.positions.open} /></Kpi>
-            <Kpi label="Money invested"><Num value={data.positions.invested} kind="inr" /></Kpi>
-            <Kpi label="Profit or loss so far">
-              <Num value={data.positions.pnl} kind="inr" colored />{" "}
-              <Num value={data.positions.pnl_pct} kind="pct" colored />
-            </Kpi>
-            <Kpi label="Money at risk" hint="What you would lose if every open position hit its stop-loss.">
-              <Num value={data.positions.open_risk} kind="inr" />
-            </Kpi>
-          </div>
-        ) : (
-          <Skeleton className="h-16" />
-        )}
-        <p><Link to="/positions">Go to Portfolio</Link></p>
-      </Card>
+      <PositionsSummary data={data} cols="grid-cols-4" />
 
       <footer className="page-footer">{health}</footer>
     </div>

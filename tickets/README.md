@@ -28,7 +28,7 @@ Status values: `todo` · `done` · `blocked` (add a reason).
 | N011 | Weekly encrypted backup from the cloud worker | N006 | sonnet | todo |
 | N012 | Phone shell: top bar, bottom tabs, More sheet, search | — | sonnet | done |
 | N013 | DataTable shows rows as cards on a phone | N012 | sonnet | done |
-| N014 | Dashboard, Alerts and Watchlist on a phone | N013 | sonnet | todo |
+| N014 | Dashboard, Alerts and Watchlist on a phone | N013 | sonnet | done |
 | N015 | Stock page on a phone | N013 | sonnet | todo |
 | N016 | Screener and rule builder on a phone | N013 | sonnet | todo |
 | N017 | Portfolio, Journal and Track record on a phone | N013 | sonnet | todo |

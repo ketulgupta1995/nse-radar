@@ -23,3 +23,6 @@ Phone cases for each page with the API mocked as the existing tests do: key sect
 
 
 ## Notes for the planner
+- Watchlist "day change": `WatchItem` (`GET /api/watchlist`) has no day-change field, only `last_close` and `added_close`. The phone card shows Last close and "Change since added" instead. A real day change needs `change_pct` added to the watchlist API and type (contract change, so not done here).
+- Alerts didn't use `DataTable` before this ticket. On a phone it now renders through `DataTable` with `meta.phone` (message = title, symbol · time · type = subtitle, a "Mark seen" button as the one pair). The laptop list is unchanged.
+- The Dashboard phone layout leaves out the laptop KPI strip. Its numbers are covered by the positions summary and the Data freshness card.
