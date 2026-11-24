@@ -70,6 +70,10 @@ DEFAULT_SETTINGS: dict[str, Any] = {
 
 
 def connect() -> sqlite3.Connection:
+    if config.TURSO_URL:  # Turso remote or embedded replica (SPEC §17.2); same sqlite3 surface
+        from app import dbdriver
+
+        return dbdriver.connect_turso()  # type: ignore[return-value]
     conn = sqlite3.connect(config.DB_PATH, timeout=10, isolation_level=None)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys=ON")
@@ -160,7 +164,27 @@ def _migrate(conn: sqlite3.Connection, version: int) -> None:
         conn.execute("COMMIT")
 
 
+def sync() -> None:
+    """Embedded replica: pull the primary's latest writes. Otherwise a no-op."""
+    if not (config.TURSO_URL and config.REPLICA_PATH):
+        return
+    conn = connect()
+    try:
+        conn.sync()  # type: ignore[attr-defined]
+    finally:
+        conn.close()
+
+
+def schema_status() -> str:
+    """Returns "ok", or "update pending" when the DB's user_version is behind SCHEMA_VERSION (§17.2)."""
+    with read() as conn:
+        version = conn.execute("PRAGMA user_version").fetchone()[0]
+    return "ok" if version >= SCHEMA_VERSION else "update pending"
+
+
 def init_db() -> None:
+    if config.RUNTIME == "vercel":
+        raise RuntimeError("migrations run in the drain, not on Vercel")
     for d in (config.DATA_DIR, config.RAW_DIR, config.DATA_DIR / "backups"):
         d.mkdir(parents=True, exist_ok=True)
     conn = connect()

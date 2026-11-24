@@ -22,3 +22,8 @@ SPEC §17.2, §4 (`db.py` contract), `docs/CLOUD_SPIKE.md` (the driver findings:
 - No import of `libsql` at module import time in local mode (import inside `connect_turso`), so tests don't need it installed to pass.
 
 ## Notes for the planner
+- `libsql` was **not** in `backend/pyproject.toml` (N001 didn't add it); added here. `.gitignore` already had `.env*`, `!.env.example`, `.vercel/`, `data/`, so it is unchanged.
+- Replica mode also sends only `PRAGMA foreign_keys=ON` (not the file PRAGMAs): libsql manages the replica file itself and forwards writes to the primary, where the others are refused.
+- Unverified against real Turso: whether libsql's `executescript` (the non-INSERT `executemany` path) leaves an open `BEGIN IMMEDIATE` alone. Python's `sqlite3.executescript` commits first; the test fake uses `autocommit=True` to model libsql as not doing so. Check that in the first drain (N004/N020).
+- The batched-script path for `executemany` returns `rowcount = -1` (a batch reports no counts). No app code reads `executemany(...).rowcount` today.
+- Out of scope, but it will matter in the cloud: `api/settings.py:165` uses `src.backup(out)` (sqlite3-only API); the wrapper has no `backup`. SPEC §4 also describes a post-migration VACUUM (T121) that `init_db` doesn't contain.
