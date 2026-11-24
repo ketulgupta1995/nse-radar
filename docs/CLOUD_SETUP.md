@@ -108,7 +108,10 @@ Every week the cloud worker saves an encrypted copy of the database as a GitHub 
    openssl enc -d -aes-256-cbc -pbkdf2 -in nse-radar-YYYY-MM-DD.db.gz.enc -out nse-radar-YYYY-MM-DD.db.gz
    gunzip nse-radar-YYYY-MM-DD.db.gz
    ```
-   You now have a normal SQLite file, `nse-radar-YYYY-MM-DD.db`.
+   You now have a normal SQLite file, `nse-radar-YYYY-MM-DD.db`. Or do both in one line (the passphrase then lands in your shell history, so prefer the two lines above):
+   ```bash
+   openssl enc -d -aes-256-cbc -pbkdf2 -pass pass:YOUR_PASSPHRASE -in nse-radar-YYYY-MM-DD.db.gz.enc | gunzip > restore.db
+   ```
 3. To restore it into Turso as a fresh database (keep the old one until the new one works):
    ```bash
    sqlite3 nse-radar-YYYY-MM-DD.db "PRAGMA journal_mode=WAL;"
@@ -116,7 +119,7 @@ Every week the cloud worker saves an encrypted copy of the database as a GitHub 
    turso db show nse-radar-restored --url
    turso db tokens create nse-radar-restored
    ```
-   Then put the new URL and token into the GitHub secrets (step 3), the Vercel variables (step 5) and `.env.local`, and redeploy on Vercel. For a mistake made in the last day, Turso's own point-in-time restore (in the Turso dashboard) is quicker.
+   (`turso db import nse-radar-YYYY-MM-DD.db` does the same as `create --from-file`, naming the new database after the file.) Then put the new URL and token into the GitHub secrets (step 3), the Vercel variables (step 5) and `.env.local`, and redeploy on Vercel. For a mistake made in the last day, Turso's own point-in-time restore (in the Turso dashboard) is quicker.
 
 ## 8. Keep private things private
 

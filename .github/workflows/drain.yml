@@ -65,4 +65,31 @@ jobs:
             data/replica.db*
             data/cache/price_store.pkl
           key: replica-${{ github.run_id }}
-      # N011 adds the encrypted backup upload here.
+      # Weekly backup (SPEC §17.8): the plain .db.gz never leaves the runner; only the .enc is uploaded.
+      - name: Encrypt the backup
+        id: backup
+        if: always()
+        env:
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          shopt -s nullglob
+          files=(data/backups/*.db.gz)
+          if [ ${#files[@]} -eq 0 ]; then echo "no backup this run"; exit 0; fi
+          if [ -z "$BACKUP_PASSPHRASE" ]; then
+            echo "::error::BACKUP_PASSPHRASE secret is missing; deleting the unencrypted backup"
+            rm -f "${files[@]}"
+            exit 1
+          fi
+          for f in "${files[@]}"; do
+            openssl enc -aes-256-cbc -pbkdf2 -salt -pass env:BACKUP_PASSPHRASE -in "$f" -out "$f.enc"
+            rm -f "$f"
+            echo "name=$(basename "$f").enc" >> "$GITHUB_OUTPUT"
+          done
+      - name: Upload the encrypted backup
+        if: always() && steps.backup.outputs.name != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.backup.outputs.name }}
+          path: data/backups/*.db.gz.enc
+          retention-days: 90
+          if-no-files-found: error

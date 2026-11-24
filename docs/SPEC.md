@@ -593,8 +593,7 @@ CREATE TABLE IF NOT EXISTS ai_requests (
 | `trail_atr_multiple` | `5.0` | `trail_hit` alert: highest close since entry − k×ATR14 at entry; 0 = off, else 1–15 (T099) |
 | `holdout_start` | `"2022-01-01"` | default test-period start for new backtests (§12.6, T113) |
 | `backtest_workers` | `3` | max worker processes for a `backtest_batch` job, clamped 1–6; 1 = never parallel (§12.2, T118) |
-| `backup_keep_phone` | `1` | phone only: how many backups to keep (the laptop keeps 7) (§17.2, T121) |
-| `backup_every_days_phone` | `7` | phone only: make a backup only when the newest is at least this many days old (§17.2, T121) |
+| `backup_every_days` | `7` | cloud (`actions` mode) only: make a backup only when the last successful one is at least this many days old; the runner keeps 1 file (§17.8, N011) |
 | `cost_model` | `{"brokerage_pct":0.03,"brokerage_cap_inr":20,"stt_pct":0.1,"exchange_pct":0.00297,"sebi_pct":0.0001,"stamp_buy_pct":0.015,"gst_pct":18,"dp_charge_inr":15.93,"slippage_pct":0.10}` | §12.1 |
 
 `GET /api/settings` returns all settings. `PUT /api/settings` takes a partial `{key: value}`, validates each key with a pydantic model, and returns all settings. Unknown keys get a 400. Source names in `source_priority` must be registered (400 otherwise).
@@ -685,7 +684,7 @@ def ensure_schedules() -> None         # create missing job_schedules rows from 
 | `backtest` | manual (enqueued by the backtest API) | 1 / interactive | — | T052 |
 | `backtest_batch` | manual (enqueued by `POST /api/backtests/batch`); params `{"backtest_ids": [...]}`, explore rows only; progress is per config, §12.2 | 1 / interactive | — | T116 |
 | `noop` | manual (tests and UI checks) | 5 / background | — | T005 |
-| `backup` | daily 02:30. `VACUUM INTO` a `.tmp` copy, checked with `quick_check` and `user_version`, then gzip-compressed to `data/backups/stock-auto-YYYY-MM-DD.db.gz` (about half the size; restore with `gunzip -k`; since 2026-11-24). Keeps the newest 7 `stock-auto-*` (`.db.gz`, or older plain `.db`), never touches other files; skips if today's exists in either form; fails if free disk < 2× DB size; failure also inserts a `backup_failed` alert. Phone rules: §17.2 | 9 / background | — | T094 |
+| `backup` | daily 02:30. `VACUUM INTO` a `.tmp` copy, checked with `quick_check` and `user_version`, then gzip-compressed to `data/backups/stock-auto-YYYY-MM-DD.db.gz` (about half the size; restore with `gunzip -k`; since 2026-11-24). Keeps the newest 7 `stock-auto-*` (`.db.gz`, or older plain `.db`), never touches other files; skips if today's exists in either form; fails if free disk < 2× DB size; failure also inserts a `backup_failed` alert. Cloud: weekly, §17.8 | 9 / background | — | T094 |
 
 Stage scale (background lane): 0 universe · 1 prices/index · 2 splits · 3 announcements/news · 4 price checks · 6 fundamentals fetch + merge · 7 screens and history backfill · 8 alerts · 9 housekeeping.
 

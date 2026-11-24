@@ -42,6 +42,7 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     },
     "holdout_start": "2022-01-01",
     "backtest_workers": 3,
+    "backup_every_days": 7,
     "ai_provider": "claude_cli",
     "ai_model": "sonnet",
     "ai_timeout_s": 240,
