@@ -47,6 +47,7 @@ Simple: dict[str, Any] = {
     "capital_inr": Annotated[float, Field(gt=0)],
     "risk_per_trade_pct": Annotated[float, Field(ge=0.1, le=5)],
     "default_time_stop_weeks": Annotated[int, Field(ge=1, le=52)],
+    "backup_every_days": Annotated[int, Field(ge=1, le=90)],
     "atr_stop_multiple": Annotated[float, Field(ge=0.5, le=10)],
     "signal_target_atr_multiple": Annotated[float, Field(ge=0.5, le=20)],
     "position_exit_sma": Annotated[int, Field(ge=20, le=300)] | Literal[0],
