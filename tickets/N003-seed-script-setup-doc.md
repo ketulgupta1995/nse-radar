@@ -21,3 +21,6 @@ SPEC §17.5, §17.6, §17.8, §4 (tables), `backend/app/db.py` (`DEFAULT_SETTING
   8. Reminder: never commit `.env.local`, and everything in the repo and the Actions logs is public
 
 ## Notes for the planner
+- The seed turns on `foreign_keys` on the copy (like `db.connect()`), so `job_logs` are cleared along with `job_runs` by ON DELETE CASCADE.
+- `job_schedules.last_run_id` still points at laptop run ids after `job_runs` is cleared. §17.6 doesn't say to clear it, so the seed leaves it alone. If the Jobs page looks that run up, add `UPDATE job_schedules SET last_run_id=NULL` to the seed.
+- CLOUD_SETUP §7 assumes N011 names the encrypted artifact `nse-radar-YYYY-MM-DD.db.gz.enc`. Update the doc if N011 picks a different name.
