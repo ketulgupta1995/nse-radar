@@ -29,18 +29,18 @@ A remote statement costs about **3–4 network round trips** (India → Mumbai: 
 
 | Source | From the laptop (honest UA) | From GitHub Actions |
 |---|---|---|
-| UDiFF bhavcopy (last 3 trading days) | 200, ~210 KB each | _pending_ |
-| Nifty 500 list CSV | 200 | _pending_ |
-| NSE corporate actions API (TCS) | 200 | _pending_ |
-| NSE announcements API (TCS, 7 days) | 200 | _pending_ |
-| NSE XBRL file | 200 | _pending_ |
-| Screener.in company page | 200 | _pending_ |
-| RSS: ET Markets, Business Standard | 200 | _pending_ |
-| yfinance TCS.NS 1 month | 21 rows | _pending_ |
+| UDiFF bhavcopy (last 3 trading days) | 200, ~210 KB each | 200, same sizes (0.1–1.3 s) |
+| Nifty 500 list CSV | 200 | 200 |
+| NSE corporate actions API (TCS) | 200 | 200 |
+| NSE announcements API (TCS, 7 days) | 200 | 200 |
+| NSE XBRL file | 200 | 200 |
+| Screener.in company page | 200 | 200 |
+| RSS: ET Markets, Business Standard | 200 | 200 |
+| yfinance TCS.NS 1 month | 21 rows | 21 rows |
 
-Turso latency from the runner to aws-us-east-1 (`/health`): _pending_
+Run 45408652532 (2026-11-24): runner 4 CPUs, 16.4 GB RAM, 93 GB free disk, Python 3.13. Turso latency from the runner to aws-us-east-1 (`/health`, warm): **62 ms** (runners aren't always in US East; the first drains in N020 measure real statement times).
 
 ## Decisions
 - Driver: **libsql**, remote on Vercel, embedded replica in Actions, behind the N002 wrapper (row objects, error mapping, batched `executemany`).
 - DB region: **aws-us-east-1** (group `us`).
-- Sources: _pending the Actions run_.
+- Sources: **every source answers the honest User-Agent from GitHub Actions.** No fallback needed.
