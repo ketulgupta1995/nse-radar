@@ -1,6 +1,6 @@
 from datetime import timedelta
 
-from app import db, timeutil
+from app import bardb, db, timeutil
 from app.jobs.context import JobContext
 from app.jobs.registry import JobDef, register
 
@@ -20,14 +20,24 @@ def run(ctx: JobContext) -> str | None:
             "DELETE FROM alerts WHERE seen_at IS NOT NULL AND seen_at < ?", (cutoff,)
         ).rowcount
     ctx.item("cleanup", "ok", f"{runs} runs, {fetch} failed fetches, {alerts} alerts")
+    _save_bar_counts()
+    ctx.item("bar_counts", "ok")
     return f"deleted {runs} runs, {alerts} alerts, {fetch} failed fetch records"
+
+
+def _save_bar_counts() -> None:
+    """Bar rows per source for the Sources page on Vercel, which can't count them itself (SPEC §17.5)."""
+    with db.read() as c:
+        counts = {r["source"]: r["rows"] for r in c.execute(bardb.COVERAGE_SQL)}
+    db.set_setting(bardb.COVERAGE_KEY, {"at": timeutil.now_iso(), "rows": counts})
 
 
 register(
     JobDef(
         name="housekeeping",
         title="Housekeeping",
-        description="Deletes job history, old failed-fetch records and seen alerts older than 90 days.",
+        description="Deletes job history, old failed-fetch records and seen alerts older than 90 days, "
+        "and counts the price rows per source for the Sources page.",
         fn=run,
         default_schedule={"kind": "daily", "at_time": "03:00"},
         stage=9,

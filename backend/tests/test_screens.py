@@ -192,8 +192,13 @@ def test_api_crud_and_errors(world, client):
     made = client.post("/api/screens", json={"name": "Over 200", "description": "d", "rule": rule}).json()
     assert made["describe"] == "Close is above 200" and made["created_by"] == "user" and not made["is_preset"]
     assert client.post("/api/screens", json={"name": "Over 200", "rule": rule}).status_code == 400
-    pv = client.post("/api/screens/preview", json={"rule": rule}).json()
-    assert pv["count"] == 1 and pv["rows"][0]["symbol"] == "UP"
+    pv = client.post("/api/screens/preview", json={"rule": rule}).json()  # a job, not a scan (§17.5)
+    assert runner.run_one("interactive") == pv["run_id"]
+    run = client.get(f"/api/jobs/runs/{pv['run_id']}").json()
+    assert run["status"] == "done" and run["ok"] == 1 and run["message"] == "1 stock matches"
+    items = client.get(f"/api/jobs/runs/{pv['run_id']}/items?status=ok").json()
+    assert [i["key"] for i in items] == ["UP"]
+    assert json.loads(items[0]["detail"]) == screens.preview(rule)["rows"][0]["values"]
 
     upd = client.put(f"/api/screens/{made['id']}", json={"name": "Over 100", "rule": rule}).json()
     assert upd["name"] == "Over 100"

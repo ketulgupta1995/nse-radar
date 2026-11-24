@@ -1,6 +1,5 @@
 """Watchlist endpoints (SPEC §13.1)."""
 
-import pandas as pd
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
@@ -15,14 +14,6 @@ class WatchAdd(BaseModel):
     note: str | None = None
 
 
-def _close_on(frame, added_at: str) -> float | None:
-    """Close of the last trading day on or before the day the stock was added (None if no bars)."""
-    if not len(frame):
-        return None
-    upto = frame.loc[: pd.Timestamp(added_at[:10])]
-    return float(upto["close"].iloc[-1]) if len(upto) else None
-
-
 @router.get("/watchlist")
 def list_watchlist() -> list[dict]:
     with db.tx() as c:
@@ -30,12 +21,12 @@ def list_watchlist() -> list[dict]:
             "SELECT w.symbol, s.name, w.added_at, w.note FROM watchlist w "
             "LEFT JOIN symbols s ON s.symbol = w.symbol ORDER BY w.added_at, w.symbol"
         ).fetchall()
-    out = []
-    for r in rows:
-        frame = frames.load_frame(r["symbol"])
-        close = float(frame["close"].iloc[-1]) if len(frame) else None
-        out.append({**dict(r), "last_close": close, "added_close": _close_on(frame, r["added_at"])})
-    return out
+    # batched key seeks, not one frame per stock (SPEC §17.5)
+    last = frames.latest_closes([r["symbol"] for r in rows])
+    added = frames.closes_on({r["symbol"]: r["added_at"][:10] for r in rows})
+    return [
+        {**dict(r), "last_close": last.get(r["symbol"]), "added_close": added.get(r["symbol"])} for r in rows
+    ]
 
 
 @router.post("/watchlist")

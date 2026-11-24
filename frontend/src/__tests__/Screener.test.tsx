@@ -6,6 +6,7 @@ import type { Screen, ScreenResult } from "../api/types";
 import ScreenList, { ranText } from "../components/screens/ScreenList";
 import ScreenResults, { newSymbols, sortResults } from "../components/screens/ScreenResults";
 import Screener from "../pages/Screener";
+import { RUN_POLL_MS } from "../lib/runs";
 
 afterEach(() => {
   cleanup();
@@ -215,10 +216,23 @@ test("saving without a name is refused in the editor", async () => {
   expect(a.calls).not.toContain("POST /api/screens");
 });
 
-test("editor preview shows the count and at most the first 50 rows", async () => {
-  const rows = Array.from({ length: 60 }, (_, i) => ({ symbol: `S${String(i).padStart(2, "0")}`, values: { Close: i } }));
-  vi.stubGlobal("fetch", vi.fn(async (url: string) => {
-    if (url === "/api/screens/preview") return new Response(JSON.stringify({ count: 60, rows }), { status: 200 });
+const previewRun = (status: string, ok = 0, message: string | null = null) => ({
+  id: 9, job: "screen_preview", trigger: "manual", status, queued_at: "x", started_at: null, finished_at: null,
+  duration_s: null, total: ok, done: ok, ok, skipped: 0, failed: 0, message, retry_of: null,
+});
+
+test("editor preview runs as a job, then shows the count and at most the first 50 rows", async () => {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  const items = Array.from({ length: 60 }, (_, i) => ({
+    key: `S${String(i).padStart(2, "0")}`, status: "ok", detail: JSON.stringify({ Close: i }), at: "x",
+  }));
+  const polls = [previewRun("queued"), previewRun("running"), previewRun("done", 60, "60 stocks match")];
+  const calls: string[] = [];
+  vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+    calls.push(`${init?.method ?? "GET"} ${url}`);
+    if (url === "/api/screens/preview") return new Response(JSON.stringify({ run_id: 9 }), { status: 200 });
+    if (url === "/api/jobs/runs/9") return new Response(JSON.stringify(polls.shift()), { status: 200 });
+    if (url.startsWith("/api/jobs/runs/9/items")) return new Response(JSON.stringify(items), { status: 200 });
     if (url === "/api/rules/describe") return new Response(JSON.stringify({ text: "x" }), { status: 200 });
     return new Response("[]", { status: 200 });
   }));
@@ -234,7 +248,34 @@ test("editor preview shows the count and at most the first 50 rows", async () =>
   );
   expect(screen.getByText("slot")).toBeTruthy();
   fireEvent.click(screen.getByText("Preview"));
+  expect(await screen.findByText(/Waiting for the cloud worker/)).toBeTruthy();
+  await act(() => vi.advanceTimersByTimeAsync(RUN_POLL_MS));
+  expect(await screen.findByText(/Running in the cloud worker/)).toBeTruthy();
+  await act(() => vi.advanceTimersByTimeAsync(RUN_POLL_MS));
   expect(await screen.findByText(/showing the first 50/)).toBeTruthy();
   expect(screen.getByText("60")).toBeTruthy();
   expect(screen.getAllByRole("row")).toHaveLength(51); // header + 50 rows
+  expect(calls).toContain("GET /api/jobs/runs/9/items?status=ok&limit=1000");
+  expect(screen.queryByText(/cloud worker/)).toBeNull();
+});
+
+test("editor preview shows why a failed preview job failed", async () => {
+  vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+    if (url === "/api/screens/preview") return new Response(JSON.stringify({ run_id: 9 }), { status: 200 });
+    if (url === "/api/jobs/runs/9") {
+      return new Response(JSON.stringify(previewRun("failed", 0, "RuleError: all[0]: no data")), { status: 200 });
+    }
+    return new Response("[]", { status: 200 });
+  }));
+  const { default: ScreenEditor } = await import("../components/screens/ScreenEditor");
+  render(
+    <ScreenEditor
+      initial={{ name: "n", description: "", rule }}
+      onSave={async () => undefined}
+      onCancel={() => undefined}
+      meta={{ catalogue: [], fields: [], ops: [{ name: ">", words: "is above" }] }}
+    />,
+  );
+  fireEvent.click(screen.getByText("Preview"));
+  expect((await screen.findByRole("alert")).textContent).toContain("RuleError: all[0]: no data");
 });

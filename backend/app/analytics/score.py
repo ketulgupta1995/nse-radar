@@ -16,7 +16,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from app import db, timeutil
+from app import config, db, timeutil
 from app.analytics import frames, indicators
 
 HISTORY_DAYS = 730
@@ -190,18 +190,23 @@ def _screen_excess(c) -> dict[int, float]:
     return {sid: latest[rule] for sid, rule in screens.items() if latest.get(rule) is not None}  # type: ignore[misc]
 
 
-def _read_tables() -> tuple[
+def _read_tables(extra: dict, saved_prices: bool = False) -> tuple[
     dict[str, list[tuple[int, str]]], dict[int, float], dict[str, dict], dict[str, str]
 ]:
+    """Screen results, backtest excess, fundamentals and names. Also fills `extra["weights"]` and,
+    with `saved_prices`, `extra["prices"]` (`_saved_prices`), all in one transaction."""
     with db.tx() as c:
+        extra["weights"] = db.get_setting("score_weights", c)
+        if saved_prices:
+            extra["prices"] = _saved_prices(c)
         rows = c.execute(
             "SELECT r.symbol, r.screen_id, s.name FROM screen_results r JOIN screens s ON s.id=r.screen_id"
         ).fetchall()
         excess = _screen_excess(c)
-        fund = {
-            r["symbol"]: json.loads(r["data"]) for r in c.execute("SELECT symbol, data FROM fundamentals")
-        }
-        names = {r["symbol"]: r["name"] for r in c.execute("SELECT symbol, name FROM symbols")}
+        mine = "WHERE symbol IN (SELECT symbol FROM screen_results)"  # candidates only (SPEC §17.5)
+        fund_rows = c.execute(f"SELECT symbol, data FROM fundamentals {mine}")
+        fund = {r["symbol"]: json.loads(r["data"]) for r in fund_rows}
+        names = {r["symbol"]: r["name"] for r in c.execute(f"SELECT symbol, name FROM symbols {mine}")}
     by_symbol: dict[str, list[tuple[int, str]]] = {}
     for r in rows:
         by_symbol.setdefault(r["symbol"], []).append((r["screen_id"], r["name"]))
@@ -213,28 +218,74 @@ def _ind(f: pd.DataFrame, bench: pd.Series, name: str, **p) -> float:
     return float(v) if _ok(v) else float("nan")
 
 
-def candidates_frame(conn=None) -> pd.DataFrame:
-    """One row per symbol in any screen's latest results, with the columns the components use.
+# Internal setting {"at": iso time, "prices": {symbol: {column: value | None}}}: the price columns of
+# every screen candidate, saved by the screens_run job. On Vercel the shortlist reads these instead of
+# loading a frame per candidate (SPEC §17.5).
+PRICES_KEY = "score_prices"
 
-    Loads price frames, so never call it inside a write transaction. `conn` is accepted for the
-    SPEC signature and ignored (tables are read in a short transaction of their own).
-    """
-    by_symbol, excess, fund, names = _read_tables()
+
+def price_columns(symbols: list[str]) -> dict[str, dict[str, float]]:
+    """{symbol: the price columns of the candidates frame}; symbols without bars are left out.
+    Loads one frame per symbol: jobs and local mode only."""
     start = (timeutil.today() - timedelta(days=HISTORY_DAYS)).isoformat()
     bench = frames.load_benchmark()
-    rows = []
-    for sym, screens in sorted(by_symbol.items()):
+    out: dict[str, dict[str, float]] = {}
+    for sym in symbols:
         f = frames.load_frame(sym, start)
         if len(f) == 0:
             continue
-
-        ex = [excess[sid] for sid, _ in screens if sid in excess]
-        row: dict[str, Any] = {
-            "symbol": sym, "name": names.get(sym), "close": float(f["close"].iloc[-1]),
+        out[sym] = {
+            "close": float(f["close"].iloc[-1]),
             "rs63": _ind(f, bench, "rel_strength", n=63), "rs126": _ind(f, bench, "rel_strength", n=126),
             "sma50": _ind(f, bench, "sma", n=50), "sma200": _ind(f, bench, "sma", n=200),
             "sma_slope": _ind(f, bench, "sma_slope", n=50, k=20),
             "pct_from_high": _ind(f, bench, "pct_from_high", n=252),
+        }  # fmt: skip
+    return out
+
+
+def save_prices() -> int:
+    """Store the price columns of every current screen candidate (`PRICES_KEY`); returns how many."""
+    with db.tx() as c:
+        rows = c.execute("SELECT DISTINCT symbol FROM screen_results ORDER BY symbol").fetchall()
+    found = price_columns([r["symbol"] for r in rows])
+    prices = {s: {k: (v if _ok(v) else None) for k, v in cols.items()} for s, cols in found.items()}
+    db.set_setting(PRICES_KEY, {"at": timeutil.now_iso(), "prices": prices})
+    return len(prices)
+
+
+def _saved_prices(conn) -> dict[str, dict[str, float]]:
+    try:
+        saved = db.get_setting(PRICES_KEY, conn).get("prices", {})
+    except KeyError:
+        return {}
+    nan = float("nan")
+    return {s: {k: nan if v is None else float(v) for k, v in cols.items()} for s, cols in saved.items()}
+
+
+def candidates_frame(conn=None) -> pd.DataFrame:
+    """One row per symbol in any screen's latest results, with the columns the components use.
+
+    Locally this loads price frames, so never call it inside a write transaction. On Vercel the price
+    columns come from the screens_run job's saved copy (`save_prices`). `conn` is accepted for the
+    SPEC signature and ignored (tables are read in a short transaction of their own).
+    """
+    return _candidates({})
+
+
+def _candidates(extra: dict) -> pd.DataFrame:
+    """`candidates_frame`; also puts the `score_weights` setting in `extra["weights"]`, read in the
+    same transaction as the tables (each transaction is several round trips on Vercel)."""
+    vercel = config.RUNTIME == "vercel"
+    by_symbol, excess, fund, names = _read_tables(extra, saved_prices=vercel)
+    prices = extra["prices"] if vercel else price_columns(sorted(by_symbol))
+    rows = []
+    for sym, screens in sorted(by_symbol.items()):
+        if sym not in prices:
+            continue
+        ex = [excess[sid] for sid, _ in screens if sid in excess]
+        row: dict[str, Any] = {
+            "symbol": sym, "name": names.get(sym), **prices[sym],
             "best_screen_oos_excess": max(ex) if ex else float("nan"),
             "screens": [n for _, n in screens],
         }  # fmt: skip
@@ -271,5 +322,6 @@ def score_frame(df: pd.DataFrame, weights: dict[str, float]) -> list[dict]:
 
 def score_candidates(conn=None) -> list[dict]:
     """Today's ranked shortlist, best first."""
-    df = candidates_frame(conn)
-    return score_frame(df, db.get_setting("score_weights"))
+    extra: dict = {}
+    df = _candidates(extra)
+    return score_frame(df, extra["weights"])

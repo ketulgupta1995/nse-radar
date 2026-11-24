@@ -126,10 +126,13 @@ def create_screen(body: ScreenIn) -> dict:
 
 @router.post("/screens/preview")
 def preview_screen(body: PreviewIn) -> dict:
+    """A scan loads a frame per universe stock, so it runs as the `screen_preview` job (SPEC §17.5).
+    Returns {run_id}; the matches are that run's `ok` items (key = symbol, detail = values JSON)."""
     try:
-        return screens.preview(body.rule)
-    except ValueError as e:  # RuleError (with its JSON path) and TooSlow
+        rules.validate_rule(body.rule)
+    except rules.RuleError as e:  # with its JSON path
         raise HTTPException(400, str(e)) from None
+    return {"run_id": runner.enqueue("screen_preview", params={"rule": body.rule}, trigger="manual")}
 
 
 @router.put("/screens/{screen_id}")

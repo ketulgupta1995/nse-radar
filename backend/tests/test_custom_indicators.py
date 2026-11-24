@@ -6,6 +6,7 @@ import pytest
 from app import db
 from app.analytics import custom_indicators as ci
 from app.analytics import indicators
+from app.jobs import runner
 
 GOOD = "def compute(frame, bench, n=20):\n    return frame.close.rolling(n).mean()\n"
 SCHEMA = [{"name": "n", "kind": "int", "default": 20, "min": 2, "max": 100, "label": "Days"}]
@@ -124,15 +125,33 @@ def test_trial_run_timeout(monkeypatch):
     assert not r["ok"] and "longer than" in r["error"]
 
 
+def approve(client, cid: int) -> dict:
+    """POST approve (the request never runs the code), then run the queued job like the worker would."""
+    r = client.post(f"/api/custom-indicators/{cid}/approve")
+    assert r.status_code == 200, r.text
+    assert r.json()["status"] == "pending"  # nothing executed on the request (SPEC §17.2)
+    run_id = r.json()["run_id"]
+    assert runner.run_one("interactive") == run_id
+    return client.get(f"/api/jobs/runs/{run_id}").json()
+
+
 def test_approve_timeout_stays_pending(client, monkeypatch):
     monkeypatch.setattr(ci, "TRIAL_TIMEOUT", 1.0)  # the code loops forever
     code = "def compute(frame, bench):\n    while True:\n        pass\n"
     cid = client.post("/api/custom-indicators", json=body(code, name="looper", schema=[])).json()["id"]
-    r = client.post(f"/api/custom-indicators/{cid}/approve")
-    assert r.status_code == 400
+    run = approve(client, cid)
+    assert run["status"] == "done" and run["failed"] == 1
+    assert run["message"].startswith("Could not approve") and "longer than" in run["message"]
     assert client.get("/api/custom-indicators").json()[0]["status"] == "pending"
     with pytest.raises(ValueError):
         indicators.get("looper")
+
+
+def test_approve_refuses_at_once_without_running(client):
+    cid = client.post("/api/custom-indicators", json=body("import os\n", name="bad_one")).json()["id"]
+    assert client.post(f"/api/custom-indicators/{cid}/approve").status_code == 400
+    with db.tx() as c:
+        assert c.execute("SELECT COUNT(*) FROM job_runs").fetchone()[0] == 0
 
 
 def test_approve_registers_and_pending_not_loaded(client):
@@ -141,9 +160,12 @@ def test_approve_registers_and_pending_not_loaded(client):
     ci.load_approved()
     with pytest.raises(ValueError):
         indicators.get("my_avg")
-    r = client.post(f"/api/custom-indicators/{cid}/approve")
-    assert r.status_code == 200, r.text
-    assert r.json()["status"] == "approved" and len(r.json()["sample"]) == 5
+    run = approve(client, cid)
+    assert run["status"] == "done" and run["ok"] == 1
+    assert run["message"].startswith("Approved. Trial run")
+    assert len(run["message"].rsplit(": ", 1)[1].split(", ")) == 5  # the last 5 trial values
+    statuses = {r["id"]: r["status"] for r in client.get("/api/custom-indicators").json()}
+    assert statuses[cid] == "approved"
     frame = pd.DataFrame({"close": [float(i) for i in range(1, 31)]})
     out = indicators.compute("my_avg", frame, None, n=5)
     assert out.iloc[-1] == pytest.approx(28.0)
@@ -158,7 +180,7 @@ def test_approve_registers_and_pending_not_loaded(client):
 
 def test_reject_and_delete(client):
     cid = client.post("/api/custom-indicators", json=body()).json()["id"]
-    assert client.post(f"/api/custom-indicators/{cid}/approve").status_code == 200
+    assert approve(client, cid)["ok"] == 1
     rule = {"all": [{"left": {"ind": "my_avg"}, "op": ">", "right": {"value": 1}}]}
     with db.tx() as c:
         c.execute(

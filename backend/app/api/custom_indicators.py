@@ -8,6 +8,7 @@ from pydantic import BaseModel
 
 from app import db, timeutil
 from app.analytics import custom_indicators as ci
+from app.jobs import runner
 
 log = logging.getLogger(__name__)
 router = APIRouter()
@@ -72,36 +73,21 @@ def list_all() -> list[dict]:
 
 @router.post("/custom-indicators/{cid}/approve")
 def approve(cid: int) -> dict:
+    """Checks that need no code execution answer at once (400); the trial run and the switch-on happen
+    in the `indicator_approve` job, because a request never executes custom code (SPEC §17.2).
+    Returns the (still pending) indicator plus the job's `run_id`."""
     with db.tx() as c:
         row = _get_row(c, cid)
     if row["status"] != "pending":
         raise HTTPException(400, f"This indicator is already {row['status']}.")
     if problems := ci.static_check(row["code"]):
         raise HTTPException(400, "; ".join(problems))
-    schema = json.loads(row["params_schema"])
     try:
-        parsed = ci.validate_params_schema(schema)
-        defaults = {p.name: int(p.default) if p.kind == "int" else p.default for p in parsed}
+        ci.validate_params_schema(json.loads(row["params_schema"]))
     except ValueError as e:
         raise HTTPException(400, str(e)) from None
-    trial = ci.trial_run(row["code"], defaults)
-    if not trial.get("ok"):
-        raise HTTPException(400, trial.get("error", "The trial run failed."))
-    with db.tx() as c:
-        c.execute(
-            "UPDATE custom_indicators SET status='approved', approved_at=? WHERE id=?",
-            (timeutil.now_iso(), cid),
-        )
-        fresh = dict(_get_row(c, cid))
-    fresh["params_schema"] = schema
-    try:
-        ci.register_row(fresh)
-    except ValueError as e:
-        with db.tx() as c:
-            c.execute("UPDATE custom_indicators SET status='pending', approved_at=NULL WHERE id=?", (cid,))
-        raise HTTPException(400, str(e)) from None
-    with db.tx() as c:
-        return _out(_get_row(c, cid), sample=trial["sample"])
+    run_id = runner.enqueue("indicator_approve", params={"indicator_id": cid}, trigger="manual")
+    return _out(row, run_id=run_id)
 
 
 @router.post("/custom-indicators/{cid}/reject")

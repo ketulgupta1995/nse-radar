@@ -4,7 +4,7 @@ from datetime import timedelta
 
 from fastapi import APIRouter, HTTPException
 
-from app import bardb, db, timeutil
+from app import bardb, config, db, timeutil
 from app.analytics import frames
 from app.sources import registry, secrets
 from app.sources.base import BaseSource
@@ -107,22 +107,35 @@ def coverage(capability: str = "bars") -> list[dict]:
     }
     if capability not in tables:
         raise HTTPException(400, f"coverage is available for: {', '.join(tables)}")
+    if capability == "bars":
+        return frames.memo("sources.coverage.bars", _bars_coverage)
     table, sym, day = tables[capability]
     sql = (
         f"SELECT source, COUNT(DISTINCT {sym}) symbols, MIN({day}) first_date, "
         f"MAX({day}) last_date, COUNT(*) rows FROM {table} GROUP BY source"
     )
-    if capability == "bars":  # compact layout (app/bardb.py): source ids and integer days
-        sql = (
-            "SELECT s.name source, COUNT(DISTINCT b.sym_id) symbols, MIN(b.day) first_date, "
-            "MAX(b.day) last_date, COUNT(*) rows FROM bars b JOIN bar_sources s ON s.id = b.source_id "
-            "GROUP BY b.source_id"
-        )
     with db.tx() as c:
-        out = [dict(r) for r in c.execute(sql)]
-    if capability == "bars":
-        for r in out:
-            r["first_date"], r["last_date"] = bardb.iso(r["first_date"]), bardb.iso(r["last_date"])
+        return [dict(r) for r in c.execute(sql)]
+
+
+def _bars_coverage() -> list[dict]:
+    """Compact layout (app/bardb.py): source ids and integer days.
+
+    On Vercel counting every bar is too heavy (SPEC §17.5): symbols and dates come from key seeks and
+    `rows` from the housekeeping job's count (0 until it has run once)."""
+    with db.read() as c:
+        if config.RUNTIME != "vercel":
+            out = [dict(r) for r in c.execute(bardb.COVERAGE_SQL)]
+        else:
+            out = [dict(r) for r in c.execute(bardb.COVERAGE_LIGHT_SQL)]
+            try:
+                counts = db.get_setting(bardb.COVERAGE_KEY, c).get("rows", {})
+            except KeyError:
+                counts = {}
+            for r in out:
+                r["rows"] = int(counts.get(r["source"], 0))
+    for r in out:
+        r["first_date"], r["last_date"] = bardb.iso(r["first_date"]), bardb.iso(r["last_date"])
     return out
 
 

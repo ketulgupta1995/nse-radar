@@ -47,8 +47,22 @@ def _count(c, sql: str, *args) -> int:
 
 @router.get("/data/health")
 def health() -> dict:
+    # also read by the dashboard; on Vercel the answer is reused for a few minutes (SPEC §17.2)
+    return frames.memo("data.health", _health)
+
+
+# Per source: how many symbols have bars, and the newest day. One key seek per (source, symbol)
+# instead of a scan of every bar (SPEC §17.5).
+_BARS_SQL = (
+    "SELECT name source, COUNT(d) n, MAX(d) last FROM (SELECT s.id, s.name, (SELECT MAX(b.day) "
+    "FROM bars b WHERE b.source_id = s.id AND b.sym_id = y.id) d FROM bar_sources s, bar_symbols y) "
+    "WHERE d IS NOT NULL GROUP BY id"
+)
+
+
+def _health() -> dict:
     week = (timeutil.today() - timedelta(days=7)).isoformat()
-    with db.read() as c:  # scans bars; must not hold the write lock
+    with db.read() as c:  # read-only: must not hold the write lock
         return {
             "last_trading_date": frames.last_trading_date(c),
             "symbols": _count(c, "SELECT COUNT(*) FROM symbols"),
@@ -57,10 +71,7 @@ def health() -> dict:
             "unparsed_actions": _count(c, "SELECT COUNT(*) FROM corp_actions WHERE kind='unparsed'"),
             "bars": {
                 r["source"]: {"symbols": r["n"], "last_date": bardb.iso(r["last"])}
-                for r in c.execute(
-                    "SELECT s.name source, COUNT(DISTINCT b.sym_id) n, MAX(b.day) last "
-                    "FROM bars b JOIN bar_sources s ON s.id = b.source_id GROUP BY b.source_id"
-                )
+                for r in c.execute(_BARS_SQL)
             },
             "fundamentals": {
                 **{

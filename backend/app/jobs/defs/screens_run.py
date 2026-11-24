@@ -1,7 +1,7 @@
 """Run saved screens over the universe (SPEC §10)."""
 
 from app import db
-from app.analytics import screens
+from app.analytics import score, screens
 from app.jobs.context import JobContext
 from app.jobs.registry import JobDef, register
 
@@ -31,6 +31,8 @@ def run(ctx: JobContext) -> str | None:
             continue
         total += n
         ctx.item(name, "ok", f"{n} matches")
+    ctx.check_stop()
+    score.save_prices()  # the shortlist on Vercel reads these (SPEC §17.5)
     return f"{len(chosen)} screens, {total} matches"
 
 

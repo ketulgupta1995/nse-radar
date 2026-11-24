@@ -4,6 +4,7 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Body, HTTPException
 
 from app import bardb, db, timeutil
+from app.analytics import frames
 from app.jobs import registry, runner, scheduler
 
 router = APIRouter()
@@ -46,31 +47,42 @@ def _schedule(row) -> dict | None:
     return d
 
 
+def _newest_runs(c, names: list[str], where: str) -> dict:
+    """{job: its newest job_runs row matching `where`}: one statement, an index seek per job."""
+    if not names:
+        return {}
+    values = ",".join("(?)" for _ in names)
+    rows = c.execute(
+        f"WITH n(job) AS (VALUES {values}) SELECT r.* FROM n JOIN job_runs r ON r.id = "
+        f"(SELECT id FROM job_runs WHERE job = n.job AND {where} ORDER BY id DESC LIMIT 1)",
+        names,
+    ).fetchall()
+    return {r["job"]: r for r in rows}
+
+
 @router.get("/jobs")
 def list_jobs() -> dict:
+    all_jobs = registry.all_jobs()
+    names = [j.name for j in all_jobs]
     jobs = []
-    with db.tx() as c:
-        for j in registry.all_jobs():
-            sched = c.execute("SELECT * FROM job_schedules WHERE job=?", (j.name,)).fetchone()
-            last = c.execute(
-                "SELECT * FROM job_runs WHERE job=? AND status NOT IN ('queued','running') "
-                "ORDER BY id DESC LIMIT 1",
-                (j.name,),
-            ).fetchone()
-            running = c.execute(
-                "SELECT * FROM job_runs WHERE job=? AND status='running' ORDER BY id DESC LIMIT 1",
-                (j.name,),
-            ).fetchone()
+    with db.tx() as c:  # a fixed handful of statements however many jobs there are (SPEC §17.5)
+        scheds = {r["job"]: r for r in c.execute("SELECT * FROM job_schedules")}
+        last = _newest_runs(c, names, "status NOT IN ('queued','running')")
+        running = _newest_runs(c, names, "status='running'")
+        enabled: dict[str, bool | None] = {}
+        for j in all_jobs:
+            if j.group not in enabled:
+                enabled[j.group] = _source_enabled(j.group, c)
             jobs.append(
                 {
                     "name": j.name,
                     "title": j.title,
                     "description": j.description,
                     "group": j.group,
-                    "source_enabled": _source_enabled(j.group, c),
-                    "schedule": _schedule(sched),
-                    "last_run": _run_summary(last) if last else None,
-                    "running": _run_summary(running) if running else None,
+                    "source_enabled": enabled[j.group],
+                    "schedule": _schedule(scheds.get(j.name)),
+                    "last_run": _run_summary(last[j.name]) if j.name in last else None,
+                    "running": _run_summary(running[j.name]) if j.name in running else None,
                 }
             )
         paused = db.get_setting("jobs_paused", c)
@@ -142,20 +154,21 @@ def pause(body: Annotated[dict[str, Any], Body()]) -> dict:
 
 @router.post("/jobs/refresh")
 def refresh() -> dict:
-    ids = []
-    for j in registry.all_jobs():
-        if not j.refresh:
-            continue
-        if _source_enabled(j.group) is False:
-            continue
-        ids.append(runner.enqueue(j.name, trigger="manual"))
-    return {"run_ids": ids}
+    jobs = [j for j in registry.all_jobs() if j.refresh]
+    with db.tx() as c:  # one transaction for the on/off checks, not one per job (SPEC §17.5)
+        enabled = {g: _source_enabled(g, c) for g in {j.group for j in jobs}}
+    on = [j for j in jobs if enabled[j.group] is not False]
+    return {"run_ids": [runner.enqueue(j.name, trigger="manual") for j in on]}
 
 
 def _last_trading_date() -> str | None:
-    with db.read() as c:  # one key seek per (source, symbol)
-        row = c.execute(bardb.LAST_DAY_SQL).fetchone()
-    return bardb.iso(row[0]) if row else None
+    def read() -> str | None:
+        with db.read() as c:  # one key seek per (source, symbol)
+            row = c.execute(bardb.LAST_DAY_SQL).fetchone()
+        return bardb.iso(row[0]) if row else None
+
+    # polled by the header: on Vercel reuse the answer for a few minutes (SPEC §17.2)
+    return frames.memo("jobs.last_trading_date", read)
 
 
 @router.get("/jobs/status")

@@ -1,6 +1,7 @@
-import { type ReactNode, useMemo, useRef, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { ApiError, api } from "../../api/client";
-import type { ScreenPreview } from "../../api/types";
+import type { ScreenPreview, ScreenPreviewStart } from "../../api/types";
+import { runOkItems, runWaitText, waitForRun } from "../../lib/runs";
 import type { Rule } from "../../lib/rules";
 import type { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
@@ -19,6 +20,7 @@ export interface Draft {
 }
 
 const PREVIEW_ROWS = 50;
+type PreviewValues = ScreenPreview["rows"][number]["values"];
 
 interface Props {
   initial: Draft;
@@ -34,18 +36,33 @@ export default function ScreenEditor({ initial, onSave, onCancel, aboveBuilder, 
   const [preview, setPreview] = useState<ScreenPreview | null>(null);
   const [busy, setBusy] = useState<"preview" | "save" | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const msg = (e: unknown) => (e instanceof ApiError ? e.message : String(e));
+  const [waiting, setWaiting] = useState<string | null>(null);
+  const alive = useRef(true);
+  useEffect(() => () => void (alive.current = false), []);
+  const msg = (e: unknown) => (e instanceof ApiError || e instanceof Error ? e.message : String(e));
 
+  // The preview scans every stock, so it runs as a job in the worker; we poll it (SPEC §17.5).
   const doPreview = async () => {
     setBusy("preview");
     setError(null);
+    setPreview(null);
     try {
-      setPreview(await api.post<ScreenPreview>("/screens/preview", { rule: draft.rule }));
+      const { run_id } = await api.post<ScreenPreviewStart>("/screens/preview", { rule: draft.rule });
+      const run = await waitForRun(run_id, (r) => setWaiting(runWaitText(r)), () => !alive.current);
+      if (!run) return;
+      if (run.status !== "done") throw new Error(run.message ?? `The preview was ${run.status}.`);
+      const items = await runOkItems(run_id);
+      setPreview({
+        count: run.ok,
+        rows: items.map((i) => ({ symbol: i.key, values: JSON.parse(i.detail ?? "{}") as PreviewValues })),
+      });
     } catch (e) {
-      setPreview(null);
       setError(msg(e));
     } finally {
-      setBusy(null);
+      if (alive.current) {
+        setBusy(null);
+        setWaiting(null);
+      }
     }
   };
   const doSave = async () => {
@@ -116,6 +133,11 @@ export default function ScreenEditor({ initial, onSave, onCancel, aboveBuilder, 
         <Button disabled={busy !== null} onClick={doSave}>Save</Button>
         <Button variant="ghost" onClick={onCancel}>Cancel</Button>
       </div>
+      {busy === "preview" && waiting && (
+        <p className="text-muted-foreground" role="status">
+          Checking every stock. {waiting}
+        </p>
+      )}
       {error && <p className="neg" role="alert">{error}</p>}
       {preview && (
         <div>

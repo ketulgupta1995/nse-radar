@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ApiError, api } from "../../api/client";
 import type { CustomIndicator } from "../../api/types";
+import { runWaitText, waitForRun } from "../../lib/runs";
 import Explain from "../Explain";
 import Modal from "../checklist/Modal";
 import { Button } from "@/components/ui/button";
@@ -14,30 +15,49 @@ interface Props {
   onRejected?: (c: CustomIndicator) => void;
 }
 
-const msg = (e: unknown) => (e instanceof ApiError ? e.message : String(e));
+const msg = (e: unknown) => (e instanceof ApiError || e instanceof Error ? e.message : String(e));
 
 export default function CustomIndicatorReview({ indicator, onClose, onApproved, onRejected }: Props) {
   const [current, setCurrent] = useState(indicator);
   const [busy, setBusy] = useState(false);
   const [trialError, setTrialError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+  const [result, setResult] = useState<string | null>(null);
+  const [waiting, setWaiting] = useState<string | null>(null);
+  const alive = useRef(true);
+  useEffect(() => () => void (alive.current = false), []);
 
   const lines = current.code.split("\n");
   const pending = current.status === "pending";
   const blocked = current.problems.length > 0;
 
+  // The trial run executes the code, which only the worker does (SPEC §17.2): start the job, wait for
+  // it, then read the indicator again. Its status says whether it was approved.
   const approve = async () => {
     setBusy(true);
     setTrialError(null);
     try {
-      const r = await api.post<CustomIndicator>(`/custom-indicators/${current.id}/approve`);
-      setCurrent(r);
-      setDone(true);
-      onApproved?.(r);
+      const started = await api.post<CustomIndicator>(`/custom-indicators/${current.id}/approve`);
+      if (started.run_id === undefined) throw new Error("The approval did not start.");
+      const run = await waitForRun(started.run_id, (r) => setWaiting(runWaitText(r)), () => !alive.current);
+      if (!run) return;
+      const all = await api.get<CustomIndicator[]>("/custom-indicators");
+      const fresh = all.find((c) => c.id === current.id) ?? started;
+      setCurrent(fresh);
+      if (fresh.status === "approved") {
+        setResult(run.message);
+        setDone(true);
+        onApproved?.(fresh);
+      } else {
+        setTrialError((run.message ?? `The trial run was ${run.status}.`).replace(/^Could not approve: /, ""));
+      }
     } catch (e) {
       setTrialError(msg(e)); // the indicator stays pending
     } finally {
-      setBusy(false);
+      if (alive.current) {
+        setBusy(false);
+        setWaiting(null);
+      }
     }
   };
 
@@ -93,10 +113,16 @@ export default function CustomIndicatorReview({ indicator, onClose, onApproved, 
         <p className="pos">Passed. The code has not run yet, so there are no sample values until you approve.</p>
       )}
 
-      {done && current.sample && (
+      {busy && waiting && (
+        <p className="text-muted-foreground" role="status">
+          Trying the code on made-up prices. {waiting}
+        </p>
+      )}
+      {done && (
         <div role="status">
-          <p className="pos"><strong>Approved.</strong> Trial run on made-up prices, last 5 values:</p>
-          <p className="num">{current.sample.map((v) => (v === null ? "–" : v.toFixed(2))).join(", ")}</p>
+          <p className="pos">
+            <strong>Approved.</strong> {(result ?? "").replace(/^Approved\.\s*/, "")}
+          </p>
         </div>
       )}
       {trialError && (
@@ -108,7 +134,8 @@ export default function CustomIndicatorReview({ indicator, onClose, onApproved, 
 
       {pending && !done && (
         <p>
-          Approving lets this code run on your laptop. Only approve if you've read it. It may only do maths on prices.
+          Approving lets this code run in the app's worker (your laptop, or the cloud worker). Only approve if
+          you've read it. It may only do maths on prices.
         </p>
       )}
       <div className="modal-foot">

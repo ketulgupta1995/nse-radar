@@ -85,3 +85,13 @@ test("log out button shows only when the password gate is on", async () => {
   render(<MemoryRouter><Settings /></MemoryRouter>);
   await waitFor(() => expect(screen.getByText("Log out")).toBeTruthy());
 });
+
+test("on Vercel 'Back up now' says backups run in the cloud worker (409)", async () => {
+  vi.spyOn(api, "get").mockImplementation((path: string) =>
+    path === "/settings" ? Promise.resolve(settings) : Promise.reject(new ApiError(404, "nope")),
+  );
+  vi.spyOn(api, "post").mockRejectedValue(new ApiError(409, "Backups run weekly in the cloud worker"));
+  render(<MemoryRouter><Settings /></MemoryRouter>);
+  fireEvent.click(await screen.findByText("Back up now"));
+  expect((await screen.findByRole("status")).textContent).toBe("Backups run weekly in the cloud worker");
+});

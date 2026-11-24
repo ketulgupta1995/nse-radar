@@ -23,7 +23,7 @@ Status values: `todo` · `done` · `blocked` (add a reason).
 | N006 | GitHub Actions workflows: ci, drain, daily | N005 | sonnet | done |
 | N007 | Vercel entry point and config | N004 | sonnet | done |
 | N008 | Password gate | N007 | sonnet | done |
-| N009 | Make every Vercel route light | N007 | opus | todo |
+| N009 | Make every Vercel route light | N007 | opus | done |
 | N010 | AI by copy-prompt in the cloud | N007 | sonnet | todo |
 | N011 | Weekly encrypted backup from the cloud worker | N006 | sonnet | todo |
 | N012 | Phone shell: top bar, bottom tabs, More sheet, search | — | sonnet | done |

@@ -18,8 +18,8 @@ export interface CustomIndicator {
   approved_at: string | null;
   /** Static-check problems; empty when the code passes. */
   problems: string[];
-  /** Trial-run values, only present on the approve response. */
-  sample?: (number | null)[];
+  /** The `indicator_approve` job, only present on the approve response (the trial runs there). */
+  run_id?: number;
 }
 
 export interface Health {
@@ -436,9 +436,15 @@ export interface ScreenResult {
   reasons: string[] | null;
 }
 
+/** What the editor shows: built from the `screen_preview` run's ok items (key = symbol, detail = values JSON). */
 export interface ScreenPreview {
   count: number;
   rows: { symbol: string; values: Record<string, number | null> }[];
+}
+
+/** `POST /screens/preview` answer: the preview runs as a job (SPEC §17.5). */
+export interface ScreenPreviewStart {
+  run_id: number;
 }
 
 export interface Announcement {

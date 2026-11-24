@@ -155,6 +155,8 @@ def put_settings(body: dict[str, Any]) -> dict:
 
 @router.post("/backup")
 def backup() -> dict:
+    if config.RUNTIME == "vercel":  # no database file here; the cloud worker backs up (SPEC §17.8)
+        raise HTTPException(409, "Backups run weekly in the cloud worker")
     dest_dir = config.DATA_DIR / "backups"
     dest_dir.mkdir(parents=True, exist_ok=True)
     dest = dest_dir / f"stock-{timeutil.now().strftime('%Y%m%d-%H%M')}.db"

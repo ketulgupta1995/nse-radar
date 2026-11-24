@@ -53,7 +53,16 @@ def news_items(symbol: str | None = None, limit: int = Query(50, ge=1, le=500)) 
     args = (symbol.upper(), limit) if symbol else (limit,)
     with db.tx() as c:
         items = [dict(r) for r in c.execute(sql, args)]
-        for it in items:
-            rows = c.execute("SELECT symbol FROM news_symbols WHERE news_id=? ORDER BY symbol", (it["id"],))
-            it["symbols"] = [r["symbol"] for r in rows]
+        tags: dict[int, list[str]] = {}
+        if items:  # one query for every item's symbols, not one per item (SPEC §17.5)
+            ids = [it["id"] for it in items]
+            rows = c.execute(
+                f"SELECT news_id, symbol FROM news_symbols WHERE news_id IN ({','.join('?' * len(ids))}) "
+                "ORDER BY news_id, symbol",
+                ids,
+            )
+            for r in rows:
+                tags.setdefault(r["news_id"], []).append(r["symbol"])
+    for it in items:
+        it["symbols"] = tags.get(it["id"], [])
     return items

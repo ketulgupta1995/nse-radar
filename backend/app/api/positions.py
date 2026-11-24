@@ -168,22 +168,20 @@ def _review(v: Any) -> str | None:
     return None if v is None else v if isinstance(v, str) else json.dumps(v)
 
 
-def _initial_stop(c: sqlite3.Connection, row: sqlite3.Row) -> float | None:
-    """Risk is measured against the stop chosen at entry, even if the stop was trailed later."""
-    if row["entry_checklist_id"]:
-        r = c.execute("SELECT answers FROM checklists WHERE id=?", (row["entry_checklist_id"],)).fetchone()
-        if r:
-            stop = json.loads(r["answers"]).get("stop")
-            if stop:
-                return float(stop)
-    return row["stop"]
-
-
-def _answers(c: sqlite3.Connection, checklist_id: int | None) -> dict:
-    if not checklist_id:
+def _checklist_answers(c: sqlite3.Connection, rows: list[sqlite3.Row]) -> dict[int, dict]:
+    """{checklist id: answers} for the entry and exit checklists of `rows`, in one query."""
+    ids = sorted({i for r in rows for i in (r["entry_checklist_id"], r["exit_checklist_id"]) if i})
+    if not ids:
         return {}
-    r = c.execute("SELECT answers FROM checklists WHERE id=?", (checklist_id,)).fetchone()
-    return json.loads(r["answers"]) if r else {}
+    marks = ",".join("?" * len(ids))
+    found = c.execute(f"SELECT id, answers FROM checklists WHERE id IN ({marks})", ids).fetchall()
+    return {r["id"]: json.loads(r["answers"]) for r in found}
+
+
+def _initial_stop(row: sqlite3.Row, answers: dict[int, dict]) -> float | None:
+    """Risk is measured against the stop chosen at entry, even if the stop was trailed later."""
+    stop = answers.get(row["entry_checklist_id"] or 0, {}).get("stop")
+    return float(stop) if stop else row["stop"]
 
 
 def _upcoming(rows: list[tuple[dict, float | None]]) -> dict[str, dict]:
@@ -195,13 +193,17 @@ def _upcoming(rows: list[tuple[dict, float | None]]) -> dict[str, dict]:
         return calendar.next_results(c, symbols)
 
 
-def _decorate(p: dict, init: float | None, upcoming: dict[str, dict] | None = None) -> dict:
+def _closes(rows: list[tuple[dict, float | None]]) -> dict[str, float | None]:
+    """Latest close of every open position among `rows`: batched key seeks, no frames (SPEC §17.5)."""
+    return frames.latest_closes({p["symbol"] for p, _ in rows if p["status"] == "open"})
+
+
+def _decorate(
+    p: dict, init: float | None, upcoming: dict[str, dict] | None = None, closes: dict | None = None
+) -> dict:
     today = timeutil.today()
     closed = p["status"] == "closed"
-    last = p["exit_price"] if closed else None
-    if not closed:
-        frame = frames.load_frame(p["symbol"])
-        last = float(frame["close"].iloc[-1]) if len(frame) else None
+    last = p["exit_price"] if closed else (closes or {}).get(p["symbol"])
     entry, stop, target, qty = p["entry_price"], p["stop"], p["target"], p["qty"]
     risk = None
     if init is not None and entry > init:
@@ -227,14 +229,15 @@ def _fetch(where: str, args: tuple = (), order: str = "id") -> list[tuple[dict, 
     """Rows plus each one's entry stop. Read in one short transaction; price frames are loaded after it."""
     with db.tx() as c:
         rows = c.execute(f"SELECT * FROM positions WHERE {where} ORDER BY {order}", args).fetchall()
-        return [(dict(r), _initial_stop(c, r)) for r in rows]
+        answers = _checklist_answers(c, rows)
+    return [(dict(r), _initial_stop(r, answers)) for r in rows]
 
 
 def _view(pid: int) -> dict:
     found = _fetch("id=?", (pid,))
     if not found:
         raise HTTPException(404, f"No position {pid}")
-    return _decorate(*found[0], _upcoming(found))
+    return _decorate(*found[0], _upcoming(found), _closes(found))
 
 
 def _get(c: sqlite3.Connection, pid: int) -> sqlite3.Row:
@@ -272,8 +275,8 @@ def list_positions(status: str = "open") -> list[dict]:
         raise HTTPException(400, "status must be open or closed")
     order = "entry_date DESC, id DESC" if status == "open" else "exit_date DESC, id DESC"
     found = _fetch("status=?", (status,), order)
-    upcoming = _upcoming(found)
-    return [_decorate(p, init, upcoming) for p, init in found]
+    upcoming, closes = _upcoming(found), _closes(found)
+    return [_decorate(p, init, upcoming, closes) for p, init in found]
 
 
 @router.post("/positions/{pid}/close")
@@ -345,13 +348,14 @@ def _group(rows: list[dict], key: str) -> dict[str, dict]:
 def journal_stats() -> dict:
     with db.tx() as c:
         rows = c.execute("SELECT * FROM positions WHERE status='closed'").fetchall()
+        answers = _checklist_answers(c, rows)
         recs = []
         for p in rows:
-            init = _initial_stop(c, p)
+            init = _initial_stop(p, answers)
             risk = p["entry_price"] - init if init is not None and p["entry_price"] > init else None
             ret = (p["exit_price"] / p["entry_price"] - 1) * 100
-            entry_ans = _answers(c, p["entry_checklist_id"])
-            exit_ans = _answers(c, p["exit_checklist_id"])
+            entry_ans = answers.get(p["entry_checklist_id"] or 0, {})
+            exit_ans = answers.get(p["exit_checklist_id"] or 0, {})
             recs.append({
                 "win": p["exit_price"] > p["entry_price"], "ret": ret,
                 "r": (p["exit_price"] - p["entry_price"]) / risk if risk else None,

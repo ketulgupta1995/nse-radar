@@ -2,8 +2,9 @@
 
 import re
 import sqlite3
+import time
 
-from app import db
+from app import config, db
 from app.sources import http
 from app.sources.base import BaseSource, CapabilitySpec
 
@@ -71,20 +72,57 @@ def set_enabled(
     _run(conn, go)
 
 
+def _enabled_map(names: list[str], c: sqlite3.Connection) -> dict[str, bool]:
+    """`is_enabled` for many sources in one query (plus one insert for sources without a row yet),
+    so a request on Vercel doesn't spend two statements per source (SPEC §17.5)."""
+    if not names:
+        return {}
+    marks = ",".join("?" * len(names))
+    q = f"SELECT source, enabled FROM source_state WHERE source IN ({marks})"
+    found = {r[0]: bool(r[1]) for r in c.execute(q, names)}
+    missing = [n for n in names if n not in found]
+    if missing:
+        c.executemany(
+            "INSERT OR IGNORE INTO source_state(source, enabled) VALUES (?, ?)",
+            [(n, 1 if _sources[n].default_enabled else 0) for n in missing],
+        )
+        found |= {r[0]: bool(r[1]) for r in c.execute(q, names)}
+    return found
+
+
+# Vercel only (SPEC §17.2): {capability: (monotonic time, source names)}. A request asks for the same
+# order several times; each ask is two Turso round trips. Cleared by `frames.invalidate()` (which every
+# priority or on/off change calls) and after `frames.VERCEL_CACHE_TTL_S`.
+ordered_cache: dict[str, tuple[float, list[str]]] = {}
+
+
 def ordered(capability: str, conn: sqlite3.Connection | None = None) -> list[BaseSource]:
+    cache = config.RUNTIME == "vercel"
+    if cache and capability in ordered_cache:
+        from app.analytics.frames import VERCEL_CACHE_TTL_S  # lazy: frames imports this module
+
+        at, names = ordered_cache[capability]
+        if time.monotonic() - at <= VERCEL_CACHE_TTL_S:
+            return [_sources[n] for n in names if n in _sources]
+
     def go(c: sqlite3.Connection) -> list[BaseSource]:
         try:
             priority = db.get_setting("source_priority", c).get(capability, [])
         except KeyError:
             priority = []
-        has = {n for n in _sources if spec(n, capability) is not None and is_enabled(n, c)}
+        on = _enabled_map([n for n in _sources if spec(n, capability) is not None], c)
+        has = {n for n, enabled in on.items() if enabled}
         first = [n for n in dict.fromkeys(priority) if n in has]
         rest = sorted(has - set(first))
         return [_sources[n] for n in [*first, *rest]]
 
-    return _run(conn, go)
+    out = _run(conn, go)
+    if cache:
+        ordered_cache[capability] = (time.monotonic(), [s.name for s in out])
+    return out
 
 
 def clear() -> None:
     """Tests only."""
     _sources.clear()
+    ordered_cache.clear()

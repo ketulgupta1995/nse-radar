@@ -70,14 +70,15 @@ def list_signals(
             [*args, max(limit, 0), max(offset, 0)],
         ).fetchall()
     out = [_row(dict(r)) for r in rows]
-    last: dict[str, float | None] = {}
-    for r in out:
-        sym = r["symbol"]
-        if sym not in last:
-            frame = frames.load_frame(sym)
-            last[sym] = float(frame["close"].iloc[-1]) if len(frame) else None
-        r["current_price"] = last[sym]
+    _add_prices(out)
     return {"total": total, "rows": out}
+
+
+def _add_prices(rows: list[dict]) -> None:
+    """`current_price` = latest close, from batched key seeks rather than one frame per stock (§17.5)."""
+    last = frames.latest_closes({r["symbol"] for r in rows})
+    for r in rows:
+        r["current_price"] = last.get(r["symbol"])
 
 
 def _mean(vals: list[float]) -> float | None:
@@ -232,11 +233,5 @@ def list_ideas(
     else:
         rows.sort(key=lambda r: (r["first_as_of"], r["id"]), reverse=True)
     page = rows[max(offset, 0) : max(offset, 0) + max(limit, 0)]
-    last: dict[str, float | None] = {}
-    for r in page:
-        sym = r["symbol"]
-        if sym not in last:
-            frame = frames.load_frame(sym)
-            last[sym] = float(frame["close"].iloc[-1]) if len(frame) else None
-        r["current_price"] = last[sym]
+    _add_prices(page)
     return {"total": len(rows), "counts": counts, "rows": page}

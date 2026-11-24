@@ -36,6 +36,24 @@ LAST_DAY_SQL = (
 )
 
 
+# Internal setting {"at": iso time, "rows": {source: bar count}}: written by the housekeeping job, read
+# by `/api/sources/coverage` on Vercel, where counting every bar is too heavy (SPEC §17.5).
+COVERAGE_KEY = "bars_coverage"
+# Per source: symbols with bars, first and last day, row count. Scans every bar: jobs only.
+COVERAGE_SQL = (
+    "SELECT s.name source, COUNT(DISTINCT b.sym_id) symbols, MIN(b.day) first_date, "
+    "MAX(b.day) last_date, COUNT(*) rows FROM bars b JOIN bar_sources s ON s.id = b.source_id "
+    "GROUP BY b.source_id"
+)
+# The same without the row count, from two key seeks per (source, symbol): light enough for a request.
+COVERAGE_LIGHT_SQL = (
+    "SELECT name source, COUNT(lo) symbols, MIN(lo) first_date, MAX(hi) last_date FROM ("
+    "SELECT s.id, s.name, (SELECT MIN(b.day) FROM bars b WHERE b.source_id = s.id AND b.sym_id = y.id) lo, "
+    "(SELECT MAX(b.day) FROM bars b WHERE b.source_id = s.id AND b.sym_id = y.id) hi "
+    "FROM bar_sources s, bar_symbols y) WHERE lo IS NOT NULL GROUP BY id"
+)
+
+
 def day(iso: str) -> int:
     """'2026-11-13' -> 20261113."""
     return int(iso[0:4] + iso[5:7] + iso[8:10])

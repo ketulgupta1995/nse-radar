@@ -3,13 +3,17 @@
 from __future__ import annotations
 
 import hashlib
+import math
 import sqlite3
 import threading
+import time
 from collections import OrderedDict
+from collections.abc import Callable, Iterable
+from typing import Any
 
 import pandas as pd
 
-from app import bardb, db
+from app import bardb, config, db
 from app.analytics import adjust, indicators, price_store
 from app.sources import registry
 
@@ -17,14 +21,19 @@ INDEX_NAME = "NIFTY 500"
 # ~124 KB each. Must exceed the liquid500-from-2012 set (~1,700 symbols), or a full scan
 # evicts every frame before it is reused.
 CACHE_SIZE = 2500
+# Vercel mode (SPEC §17.2): every price-derived cache entry lives at most this long, because another
+# process (the cloud worker) writes new prices and nothing tells this one.
+VERCEL_CACHE_TTL_S = 300
 
 _cache: OrderedDict[str, pd.DataFrame] = OrderedDict()
 _breadth: dict[tuple, pd.Series] = {}
 _results: dict[tuple, list[pd.Timestamp]] = {}
 _industry_returns: dict[tuple, pd.DataFrame] = {}
 _industries: dict[str, str | None] = {}
+_memo: dict[str, Any] = {}
 _lock = threading.Lock()
 _extra_caches: list[dict] = []  # caches in other modules that are derived from prices
+_cleared_at = time.monotonic()
 
 
 def register_cache(cache: dict) -> dict:
@@ -34,6 +43,7 @@ def register_cache(cache: dict) -> dict:
 
 
 register_cache(price_store.holder)  # invalidate() forces the price store to re-validate
+register_cache(registry.ordered_cache)  # vercel's cached source orders (priority or on/off changed)
 
 BREADTH_MIN_STOCKS = 20
 INDUSTRY_MIN_STOCKS = 3
@@ -52,15 +62,39 @@ def invalidate() -> None:
 
 
 def _clear() -> None:
+    global _cleared_at
     with _lock:
         _cache.clear()
         _breadth.clear()
         _results.clear()
         _industry_returns.clear()
         _industries.clear()
+        _memo.clear()
+        _cleared_at = time.monotonic()
     indicators.clear_memo()
     for cache in _extra_caches:
         cache.clear()
+
+
+def _expire() -> None:
+    """Vercel mode: drop every price-derived cache once it is `VERCEL_CACHE_TTL_S` old (SPEC §17.2)."""
+    if config.RUNTIME == "vercel" and time.monotonic() - _cleared_at > VERCEL_CACHE_TTL_S:
+        _clear()
+
+
+def memo(key: str, fn: Callable[[], Any]) -> Any:
+    """`fn()`, reused for up to `VERCEL_CACHE_TTL_S` in vercel mode, so a page polled every few seconds
+    doesn't re-read Turso each time. Locally (and in the drain) always fresh. Cleared by `invalidate()`."""
+    if config.RUNTIME != "vercel":
+        return fn()
+    _expire()
+    with _lock:
+        if key in _memo:
+            return _memo[key]
+    value = fn()
+    with _lock:
+        _memo[key] = value
+    return value
 
 
 def bars_source(symbol: str, conn: sqlite3.Connection | None = None) -> str | None:
@@ -82,8 +116,9 @@ def _tag(key: tuple) -> str:
 
 
 def _validated() -> dict | None:
+    _expire()
     ctx = price_store.current()
-    if ctx is None and price_store.ENABLED:
+    if ctx is None and price_store.enabled():
         with adjust.use_conn(None) as c:
             ctx = price_store.ensure_valid(c)
     return ctx
@@ -159,6 +194,7 @@ def results_dates(symbol: str) -> list[pd.Timestamp]:
     """First day the market could trade on each quarterly result (point-in-time, SPEC §9.4)."""
     from app.analytics import fundamentals  # lazy: keeps module import order simple
 
+    _expire()
     symbol = symbol.upper()
     with adjust.use_conn(None) as c:
         n = c.execute("SELECT COUNT(*) FROM quarters WHERE symbol=?", (symbol,)).fetchone()[0]
@@ -209,6 +245,7 @@ def load_breadth(n: int) -> pd.Series:
     Uses each stock's adjusted frame, so splits don't count as drops. Dates with fewer than
     `BREADTH_MIN_STOCKS` stocks that have an n-day average are NaN. Cached until prices change.
     """
+    _expire()
     symbols = universe()
     key = (n, last_trading_date(), len(symbols))
     with _lock:
@@ -237,6 +274,7 @@ def load_breadth(n: int) -> pd.Series:
 
 def industry_of(symbol: str) -> str | None:
     """`symbols.industry`, stripped; None if empty or unknown. Cached until `invalidate()`."""
+    _expire()
     with _lock:
         loaded = bool(_industries)
     if not loaded:
@@ -256,6 +294,7 @@ def load_industry_returns(n: int) -> pd.DataFrame:
     An industry needs `INDUSTRY_MIN_STOCKS` stocks with a value on a date, the market column
     `MARKET_MIN_STOCKS`; otherwise NaN. Cached per (n, last trading date, universe size).
     """
+    _expire()
     symbols = universe()
     key = (n, last_trading_date(), len(symbols))
     with _lock:
@@ -313,3 +352,92 @@ def last_trading_date(conn: sqlite3.Connection | None = None) -> str | None:
             (ordered[0].name,),
         ).fetchone()
     return bardb.iso(row[0])
+
+
+# ---- light reads for list pages (SPEC §17.5) ---------------------------------------------------
+
+_LATEST = 99991231
+_CHUNK = 200  # (symbol, day) pairs per statement: 2 variables each, well under SQLite's limit
+Found = tuple[str, int | None, float | None]  # (source, bar day, raw close)
+
+
+def _raw_closes(wanted: dict[str, int], c: sqlite3.Connection) -> dict[str, Found]:
+    """{symbol: (source, bar day, raw close)} of the last bar on or before each wanted day.
+
+    The source is `bars_source`'s choice (the first enabled source with any bars for the symbol), so
+    the day/close are None when that source has no bar by then. One statement per chunk of symbols,
+    covering every bars source; every lookup is a primary-key seek.
+    """
+    order = [s.name for s in registry.ordered("bars", c)]
+    rank = {name: i for i, name in enumerate(order)}
+    best: dict[str, tuple[int, Found]] = {}
+    syms = sorted(wanted)
+    seek = "FROM bars b WHERE b.source_id = s.id AND b.sym_id = y.id"
+    for i in range(0, len(syms) if order else 0, _CHUNK):
+        part = syms[i : i + _CHUNK]
+        values = ",".join("(?,?)" for _ in part)
+        rows = c.execute(
+            f"WITH q(symbol, d) AS (VALUES {values}) SELECT q.symbol, s.name, "
+            f"(SELECT MAX(b.day) {seek}), "
+            f"(SELECT MAX(b.day) {seek} AND b.day <= q.d), "
+            f"(SELECT b.close_p / 100.0 {seek} AND b.day <= q.d ORDER BY b.day DESC LIMIT 1) "
+            "FROM q JOIN bar_symbols y ON y.symbol = q.symbol "
+            f"JOIN bar_sources s ON s.name IN ({','.join('?' * len(order))})",
+            [v for sym in part for v in (sym, wanted[sym])] + order,
+        ).fetchall()
+        for sym, src, any_day, day, close in rows:
+            if any_day is not None and (sym not in best or rank[src] < best[sym][0]):
+                best[sym] = (rank[src], (src, day, None if close is None else float(close)))
+    return {sym: found for sym, (_, found) in best.items()}
+
+
+def _later_factor(found: dict[str, Found], c: sqlite3.Connection) -> dict[str, float]:
+    """{symbol: product of adjustment factors with an ex-date after its bar}, as `apply_factors` would
+    scale that bar. Only symbols on an unadjusted source with such an event are read in full, so the
+    usual case costs one query."""
+    todo = {s: d for s, (src, d, _) in found.items()
+            if d is not None and getattr(registry.spec(src, "bars"), "adjusted", None) is False}  # fmt: skip
+    if not todo:
+        return {}
+    first = bardb.iso(min(todo.values()))
+    marks = ",".join("?" * len(todo))
+    syms = sorted(todo)
+    rows = c.execute(
+        f"SELECT symbol FROM corp_actions WHERE symbol IN ({marks}) AND kind IN ('split','bonus') "
+        f"AND factor IS NOT NULL AND ex_date > ? UNION SELECT symbol FROM event_factors WHERE symbol IN "
+        f"({marks}) AND factor IS NOT NULL AND ex_date > ? UNION SELECT symbol FROM manual_adjustments "
+        f"WHERE symbol IN ({marks}) AND ex_date > ?",
+        [*syms, first, *syms, first, *syms, first],
+    ).fetchall()
+    out: dict[str, float] = {}
+    for (sym,) in rows:
+        day = bardb.iso(todo[sym])
+        later = [f for ex, f in adjust.adjustment_factors(sym, c) if ex > day]
+        if later:
+            out[sym] = math.prod(later)
+    return out
+
+
+def closes_on(days: dict[str, str | None], conn: sqlite3.Connection | None = None) -> dict[str, float | None]:
+    """{symbol: adjusted close of the last bar on or before the day (None = the newest bar)}.
+
+    Gives what `load_frame(symbol)` would show for that bar, without loading frames: a few key-seek
+    statements in all, so list pages stay light on Vercel (SPEC §17.5). It reads the symbol's own
+    ticker only (not the bars of a ticker it was renamed from). None when there is no such bar.
+    """
+    wanted = {s.upper(): (_LATEST if d is None else bardb.day(d[:10])) for s, d in days.items()}
+    if not wanted:
+        return {}
+    with adjust.use_conn(conn) as c:
+        found = _raw_closes(wanted, c)
+        factor = _later_factor(found, c)
+    out: dict[str, float | None] = {}
+    for sym in wanted:
+        close = found.get(sym, ("", None, None))[2]
+        out[sym] = None if close is None else close * factor.get(sym, 1.0)
+    return out
+
+
+def latest_closes(symbols: Iterable[str], conn: sqlite3.Connection | None = None) -> dict[str, float | None]:
+    """{symbol: newest adjusted close} (None without bars); `closes_on` for today."""
+    return closes_on({s: None for s in symbols}, conn)

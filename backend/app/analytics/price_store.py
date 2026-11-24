@@ -38,9 +38,14 @@ _store: dict = {"path": None, "order": None, "raw": {}, "months": {}, "seen": {}
 holder: dict = {}
 
 
+def enabled() -> bool:
+    """Off in vercel mode (SPEC §17.2): validating reads every bar, which no request may do."""
+    return ENABLED and config.RUNTIME != "vercel"
+
+
 def current() -> dict | None:
     """The validated view (freshness table, reference data), or None if not validated / disabled."""
-    return holder.get("ctx") if ENABLED else None
+    return holder.get("ctx") if enabled() else None
 
 
 def rows_to_frame(rows) -> pd.DataFrame:
@@ -86,7 +91,7 @@ def _load_file(order: list[str]) -> dict:
 def save_if_dirty() -> None:
     """Write the store atomically if anything changed since it was loaded or last saved."""
     with _lock:
-        if not ENABLED or not _store["dirty"] or _store["path"] != str(config.DB_PATH):
+        if not enabled() or not _store["dirty"] or _store["path"] != str(config.DB_PATH):
             return
         data = {
             "version": VERSION, "bars_order": _store["order"], "raw": _store["raw"],
@@ -194,7 +199,7 @@ def _rewritten_symbols(fresh: dict, seen: dict, dropped: set[Key]) -> set[str]:
 
 def ensure_valid(conn: sqlite3.Connection) -> dict | None:
     """Validate the store against the database (once per data version); None if disabled."""
-    if not ENABLED:
+    if not enabled():
         return None
     with _lock:
         ctx = holder.get("ctx")
