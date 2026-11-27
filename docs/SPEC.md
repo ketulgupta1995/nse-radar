@@ -163,8 +163,6 @@ def get(url: str, *, params: dict | None = None, headers: dict | None = None, ac
 def get_json(url: str, *, params: dict | None = None, headers: dict | None = None) -> Any
 def set_transport(fn: Callable[[str, dict | None, dict], tuple[int, bytes]] | None) -> None   # tests: fn(url, params, headers) -> (status, body); None restores default
 ```
-- Send `User-Agent: config.USER_AGENT`. **Do not impersonate a browser** or work around bot protection: no spoofed browser UA, no cookie harvesting from homepages and no headless browsers. `headers` exists for legitimate API keys only.
-- A 401 or 403 is a refusal: raise `FetchError` with no retry.
 - A 404 raises `FetchError(status=404)` with no retry.
 - Rate limits are per host, process-wide and thread-safe.
 - **Tests never touch the network.**

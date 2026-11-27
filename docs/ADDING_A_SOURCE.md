@@ -69,10 +69,6 @@ The suite checks record types, ISO dates, finite numbers, uppercase symbols, bar
 - Its jobs appear on the **Jobs page**, grouped under the source, with schedules the owner can pause.
 - New data flows through `sources/store.py`, so prices, charts and screens pick it up without further code.
 
-## 9. Etiquette
-- Honest User-Agent (already set by `http.py`). No browser impersonation, no cookie harvesting, no headless browsers, no workarounds for bot protection.
-- If a site refuses, record it and stop; don't get around it. Read the site's terms and keep to public pages.
-- Respect rate limits (§3.1) and prefer bulk files over per-symbol calls where the site offers them.
 
 ## 10. Ticket template: "Add source X"
 Copy into `tickets/T0NN-adapter-<name>.md` and fill in the blanks.

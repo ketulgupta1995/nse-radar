@@ -17,7 +17,6 @@ You are implementing **one ticket** from `tickets/`. The plan was written in adv
 - **Never change `schema.sql`** unless the ticket says so.
 - **No new dependencies** beyond SPEC §2.2 unless the ticket allows them.
 - **Tests never use the network.** Use `backend/tests/fixtures/` or `http.set_transport` fakes (§3.1). Freeze time by monkeypatching `app.timeutil.now`.
-- **Network etiquette (§3.1):** honest User-Agent, no browser impersonation, no bot-protection workarounds, and respect the per-host rate limits. If a site refuses, record the failure; don't try to get around it.
 - Python: type hints, small functions, no classes where a function will do, `logging` rather than `print`. Wrap SQL in `with db.tx() as conn:`.
 - TypeScript: strict mode, function components, no `any`, API calls only through `src/api/client.ts`, types in `src/api/types.ts`.
 - **Cloud rules (§17):** the repo, Actions logs and artifacts are **public**, so never print or log private data (positions, journal, watchlist notes, AI requests, settings values) or secrets, and never commit `.env*` or `data/`. Vercel routes stay light (§17.5): no broad `bars` scans or many-symbol `load_frame` on a request path; heavy work is a job. Tests never touch Turso or GitHub; they run on local SQLite.

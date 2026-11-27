@@ -12,8 +12,6 @@ These are the facts behind SPEC §3. When a ticket worker confirms or corrects s
   - `corporates-financial-results?index=equities&period=Quarterly&symbol=TCS`: 200, 162 items. Fixture (3 items): `fixtures/sources/nse_api/financial_results_TCS.json`. It includes the `xbrl` URL.
 - Screener `company/TCS/consolidated/`: HTTP 200, 284 KB, with sections `quarters`, `profit-loss`, `ratios`, `shareholding`, and labels Market Cap / Stock P/E / ROCE / ROE / Book Value / Dividend Yield. Fixture: `fixtures/sources/screener/TCS_consolidated.html`.
 
-## Caveat: how the probe was made
-The planner probe sent a **browser-like User-Agent**. The app must use the honest `config.USER_AGENT` (SPEC §3.1), so NSE may answer the app differently. T004/T013/T014 workers must record here what NSE returns to the honest UA. If NSE refuses it (403), say so and stop rather than working around it. The owner will decide the fallback (yfinance-only prices).
 
 ## Unverified (the worker checks and records the result)
 - announcements `from_date`/`to_date` params
@@ -70,4 +68,4 @@ All three default RSS feeds fetched once with the **honest User-Agent**; all ret
 - `robots.txt`: this path is not disallowed for `*`; crawl delay 1 s. Our policy is 3 s, 5 pages, once a day. Report PDFs and `/get-document/` are login-only or disallowed and are never fetched.
 - On Sell rows `Upside(%)` is published **unsigned** (target below price, still a positive number). Stored as published; the page shows no "+".
 - **Terms** (`/terms/`) forbid keeping the site's information in a searchable database without written permission. The owner was told this on 2026-11-27 and chose to use it for personal use only. Don't widen it (no backfill, no sharing). Test fixtures are made up because the repo is public.
-- Not yet checked: whether GitHub Actions runners are allowed. If the site refuses, the source pauses itself; do not work around it.
+- **GitHub Actions is refused:** the first live run (2026-11-27) got HTTP 405, while the owner's laptop got 200. The adapter treats 405 as a refusal, so the source pauses itself.
