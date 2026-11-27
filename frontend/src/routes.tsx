@@ -8,6 +8,7 @@ import {
   LayoutDashboard,
   LineChart,
   ListChecks,
+  Newspaper,
   Settings as SettingsIcon,
   Star,
   Wallet,
@@ -20,6 +21,7 @@ import Journal from "./pages/Journal";
 import NotFound from "./pages/NotFound";
 import Jobs from "./pages/Jobs";
 import Portfolio from "./pages/Portfolio";
+import Research from "./pages/Research";
 import Screener from "./pages/Screener";
 import Settings from "./pages/Settings";
 import Sources from "./pages/Sources";
@@ -47,6 +49,7 @@ export const routes: AppRoute[] = [
   { path: "/", label: "Dashboard", nav: true, group: "Research", icon: LayoutDashboard, phoneTab: 1, element: <Dashboard /> },
   { path: "/screener", label: "Screener", nav: true, group: "Research", icon: Filter, phoneTab: 2, element: <Screener /> },
   { path: "/watchlist", label: "Watchlist", nav: true, group: "Research", icon: Star, phoneTab: 3, element: <Watchlist /> },
+  { path: "/research", label: "Broker reports", nav: true, group: "Research", icon: Newspaper, element: <Research /> },
   { path: "/stock/:symbol", label: "Stock", nav: false, element: <Stock /> },
   { path: "/positions", label: "Portfolio", nav: true, group: "Money", icon: Wallet, phoneTab: 4, element: <Portfolio /> },
   { path: "/journal", label: "Journal", nav: true, group: "Money", icon: BookOpen, element: <Journal /> },

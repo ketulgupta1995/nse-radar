@@ -69,6 +69,13 @@ CREATE TABLE IF NOT EXISTS news_symbols (
   news_id INTEGER NOT NULL REFERENCES news_items(id) ON DELETE CASCADE, symbol TEXT NOT NULL,
   PRIMARY KEY (news_id, symbol));
 
+CREATE TABLE IF NOT EXISTS research_reports (
+  source TEXT NOT NULL, report_id TEXT NOT NULL, date TEXT NOT NULL, symbol TEXT, stock TEXT NOT NULL,
+  author TEXT NOT NULL, type TEXT NOT NULL CHECK (type IN ('Buy','Sell')), ltp REAL, target REAL,
+  reco_price REAL, change_pct REAL, upside_pct REAL, url TEXT, first_seen_at TEXT NOT NULL,
+  fetched_at TEXT NOT NULL, PRIMARY KEY (source, report_id));
+CREATE INDEX IF NOT EXISTS research_reports_date ON research_reports(date);
+
 -- owner data
 CREATE TABLE IF NOT EXISTS watchlist (symbol TEXT PRIMARY KEY, added_at TEXT NOT NULL, note TEXT);
 CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);

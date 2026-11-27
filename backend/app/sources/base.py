@@ -20,6 +20,7 @@ Capability = Literal[
     "news",
     "symbol_changes",
     "events",
+    "research",
 ]
 
 
@@ -122,6 +123,24 @@ class Event:
     description: str | None = None  # board meeting from the event calendar
 
 
+@dataclass(frozen=True)
+class ResearchReport:
+    """One Buy or Sell row from a broker research-report list. Prices in ₹, changes in percent."""
+
+    report_id: str  # the source's own permanent id for the report
+    date: str
+    stock: str
+    author: str
+    type: Literal["Buy", "Sell"]
+    symbol: str | None = None  # NSE ticker, when the source links the stock to one
+    ltp: float | None = None  # last price at the time of fetching
+    target: float | None = None
+    reco_price: float | None = None
+    change_pct: float | None = None  # since the recommendation
+    upside_pct: float | None = None  # as published: may be unsigned, even on a Sell
+    url: str | None = None
+
+
 class SourceRefused(Exception):
     """Site refused us (401/403/429): the job stops and the source is paused."""
 
@@ -207,6 +226,9 @@ class BaseSource:
         raise NotImplementedError
 
     def events(self) -> list[Event]:
+        raise NotImplementedError
+
+    def research(self) -> list[ResearchReport]:
         raise NotImplementedError
 
     def secret(self, key: str) -> str | None:

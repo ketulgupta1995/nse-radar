@@ -32,6 +32,7 @@ CAP_LABEL = {
     "news": "news",
     "symbol_changes": "ticker changes",
     "events": "board meetings",
+    "research": "broker research calls",
 }
 
 # capability -> (stage, follow-up jobs enqueued when the run stored >= 1 row)
@@ -42,6 +43,7 @@ STAGES: dict[str, tuple[int, tuple[str, ...]]] = {
     "index": (1, ("screens_run",)),
     "actions": (2, ("event_factors", "price_checks")),
     "events": (3, ()),
+    "research": (3, ()),
     "announcements": (3, ("alerts_scan",)),
     "news": (3, ("alerts_scan",)),
     "fundamentals": (6, ("fundamentals_merge",)),
@@ -278,6 +280,8 @@ def _fetch(source: str, capability: str, key: str, variant: JobVariant):
             return src.symbol_changes()
         if capability == "events":
             return src.events()
+        if capability == "research":
+            return src.research()
     except FetchError as e:
         raise from_fetch_error(e) from e
     raise ValueError(f"unknown capability: {capability}")

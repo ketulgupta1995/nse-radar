@@ -53,7 +53,8 @@ def _source(c, src: BaseSource) -> dict:
             }
             for cs in src.capabilities
         ],
-        "secrets": secrets.status(src.name),
+        # only sources that declare secrets can have stored ones; the lookup costs a connection each
+        "secrets": secrets.status(src.name) if src.secrets else {},
         "stats": _stats(c, src.name),
     }
 

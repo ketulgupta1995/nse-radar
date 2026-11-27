@@ -72,6 +72,7 @@ LIGHT = [
     "/api/news/categories",
     "/api/news/announcements",
     "/api/news/items",
+    "/api/research/reports",
     "/api/data/health",
     "/api/data/checks",
     "/api/data/unparsed-actions",
@@ -172,6 +173,11 @@ def _seed() -> dict:
                 (f"2026-11-0{1 + i % 5}T10:00:00", f"t{i}", f"https://x/{i}"),
             ).lastrowid
             c.execute("INSERT INTO news_symbols(news_id, symbol) VALUES (?,?)", (nid, SYMS[i]))
+        c.executemany(
+            "INSERT INTO research_reports(source, report_id, date, symbol, stock, author, type, "
+            "first_seen_at, fetched_at) VALUES ('t',?,'2026-11-06',?,'n','a','Buy','x','x')",
+            [(str(i), s) for i, s in enumerate(SYMS)],
+        )
         for i in range(30):
             c.execute(
                 "INSERT INTO backtests(name, config, status, kind, created_at) "

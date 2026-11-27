@@ -11,7 +11,7 @@ TABLES = {
     "news_symbols", "watchlist", "settings", "checklists", "positions", "screens", "screen_results",
     "custom_indicators", "backtests", "job_schedules", "job_runs", "job_items", "job_logs", "alerts",
     "ai_requests", "signals", "signal_outcomes", "signal_days",
-    "symbol_changes", "event_factors", "instruments", "events", "source_secrets",
+    "symbol_changes", "event_factors", "instruments", "events", "source_secrets", "research_reports",
 }
 
 
@@ -27,7 +27,7 @@ def test_all_tables_exist():
 def test_fresh_db_is_current_version():
     db.init_db()
     conn = db.connect()
-    assert conn.execute("PRAGMA user_version").fetchone()[0] == db.SCHEMA_VERSION == 13
+    assert conn.execute("PRAGMA user_version").fetchone()[0] == db.SCHEMA_VERSION == 14
     conn.close()
 
 

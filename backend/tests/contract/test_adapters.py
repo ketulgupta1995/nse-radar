@@ -24,6 +24,7 @@ from app.sources.base import (
     NewsItem,
     NotFound,
     Quarter,
+    ResearchReport,
     SourceError,
     SourceRefused,
     SymbolChange,
@@ -42,6 +43,7 @@ RECORD_TYPES = {
     "universe": SymbolRow, "bars": Bar, "actions": Action, "index": IndexBar,
     "quarters": Quarter, "announcements": Announcement, "news": NewsItem,
     "symbol_changes": SymbolChange, "events": Event,
+    "research": ResearchReport,
 }  # fmt: skip
 
 
@@ -156,6 +158,8 @@ def call(src: BaseSource, capability: str, args: dict):
         return src.news()
     if capability == "symbol_changes":
         return src.symbol_changes()
+    if capability == "research":
+        return src.research()
     if capability == "events":
         return src.events()
     raise AssertionError(f"unknown capability in cases.json: {capability}")
@@ -202,6 +206,11 @@ def check_record(r) -> None:
             assert v is None or finite(v), r
     elif isinstance(r, Announcement):
         assert r.symbol == r.symbol.upper() and has_offset(r.ts) and r.headline, r
+    elif isinstance(r, ResearchReport):
+        assert r.report_id and r.stock and r.author and r.type in ("Buy", "Sell"), r
+        assert is_iso_date(r.date) and (r.symbol is None or r.symbol == r.symbol.upper()), r
+        for v in (r.ltp, r.target, r.reco_price, r.change_pct, r.upside_pct):
+            assert v is None or finite(v), r
     elif isinstance(r, NewsItem):
         assert has_offset(r.ts) and r.title and r.url, r
     elif isinstance(r, FundSnapshot):

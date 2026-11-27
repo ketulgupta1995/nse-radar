@@ -22,6 +22,7 @@ from app.sources.base import (
     IndexBar,
     NewsItem,
     Quarter,
+    ResearchReport,
     SymbolChange,
     SymbolRow,
 )
@@ -58,6 +59,7 @@ def save(capability: str, source: str, records, *, key: str, conn: sqlite3.Conne
         "news": save_news,
         "symbol_changes": save_symbol_changes,
         "events": save_events,
+        "research": save_research,
     }
     if capability not in writers:
         raise ValueError(f"unknown capability: {capability}")
@@ -159,6 +161,26 @@ def save_events(source: str, items: list[Event], conn: sqlite3.Connection) -> in
         "INSERT OR REPLACE INTO events(source, symbol, date, purpose, description, fetched_at) "
         "VALUES (?,?,?,?,?,?)",
         [(source, e.symbol, e.date, e.purpose, e.description, fetched) for e in items],
+    )
+    return len(items)
+
+
+def save_research(source: str, items: list[ResearchReport], conn: sqlite3.Connection) -> int:
+    """A report seen again gets its latest values; `first_seen_at` keeps the first fetch."""
+    now = timeutil.now_iso()
+    conn.executemany(
+        "INSERT INTO research_reports(source, report_id, date, symbol, stock, author, type, ltp, target, "
+        "reco_price, change_pct, upside_pct, url, first_seen_at, fetched_at) "
+        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) "
+        "ON CONFLICT(source, report_id) DO UPDATE SET date=excluded.date, symbol=excluded.symbol, "
+        "stock=excluded.stock, author=excluded.author, type=excluded.type, ltp=excluded.ltp, "
+        "target=excluded.target, reco_price=excluded.reco_price, change_pct=excluded.change_pct, "
+        "upside_pct=excluded.upside_pct, url=excluded.url, fetched_at=excluded.fetched_at",
+        [
+            (source, r.report_id, r.date, r.symbol, r.stock, r.author, r.type, r.ltp, r.target,
+             r.reco_price, r.change_pct, r.upside_pct, r.url, now, now)
+            for r in items
+        ],
     )
     return len(items)
 

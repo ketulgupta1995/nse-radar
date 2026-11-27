@@ -64,3 +64,10 @@ All three default RSS feeds fetched once with the **honest User-Agent**; all ret
 - **Tools off:** `--tools ""` (help text: `Use "" to disable all tools`; `"default"` = the normal set). Used by `claude_cli`. `--allowedTools`/`--disallowedTools` also exist but are not used.
 - **Output:** `-p --output-format json` returns a JSON object whose `result` field is the reply text. Verified 2026-11-09 with a real call through `claude_cli` (CLI 2.1.319, model haiku, env stripped, `--tools ""`): prompt "Reply with exactly the word: pong" → `"pong"`.
 - Other flags used: `--model <model>`; the prompt goes on stdin.
+
+## Trendlyne research reports (checked 2026-11-27, from the owner's laptop)
+- Page `https://trendlyne.com/research-reports/all/`, then `?page=N`. Server-rendered table `#brokerTable`; about 20 rows on page 1, 10 on later pages. HTTP 200 with the **honest User-Agent**.
+- `robots.txt`: this path is not disallowed for `*`; crawl delay 1 s. Our policy is 3 s, 5 pages, once a day. Report PDFs and `/get-document/` are login-only or disallowed and are never fetched.
+- On Sell rows `Upside(%)` is published **unsigned** (target below price, still a positive number). Stored as published; the page shows no "+".
+- **Terms** (`/terms/`) forbid keeping the site's information in a searchable database without written permission. The owner was told this on 2026-11-27 and chose to use it for personal use only. Don't widen it (no backfill, no sharing). Test fixtures are made up because the repo is public.
+- Not yet checked: whether GitHub Actions runners are allowed. If the site refuses, the source pauses itself; do not work around it.

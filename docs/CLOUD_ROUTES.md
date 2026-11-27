@@ -58,6 +58,7 @@ never appear in `GET /api/settings`.
 | `/api/alerts`, `/alerts/count`, `/alerts/kinds` | `alerts` | 0–4 | light | as local |
 | `/api/news/categories`, `/news/announcements` | categories file, `announcements` | 0–4 | light | as local |
 | `/api/news/items` | `news_items` + their symbols | 5 | light (was 1 + one per item) | symbols for all items in one query |
+| `/api/research/reports` | `research_reports` + `symbols` | 2 | light | one indexed read, at most 2,000 rows |
 | `/api/data/health` | counts of small tables; per source: symbols with bars, newest day | 14 | light (was a scan of every bar) | the bars part is one key seek per (source, symbol) instead of a scan (same answer, both modes); the whole answer is reused for 5 min on Vercel |
 | `/api/data/checks`, `/data/unparsed-actions`, `/data/event-factors`, `/data/symbol-changes` | small tables | 4–5 | light | as local |
 | `/api/backtests`, `/backtests/exits`, `/backtests/{id}` | `backtests` rows (equity/trades only for one) | 0–5 | light | as local |

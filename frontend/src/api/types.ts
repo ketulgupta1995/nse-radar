@@ -765,3 +765,23 @@ export interface SignalsSummary {
   n_signals: number;
   n_ideas: number;
 }
+
+/** One broker Buy or Sell call (GET /research/reports). */
+export interface ResearchReport {
+  source: string;
+  report_id: string;
+  date: string;
+  symbol: string | null;
+  stock: string;
+  author: string;
+  type: "Buy" | "Sell";
+  ltp: number | null;
+  target: number | null;
+  reco_price: number | null;
+  change_pct: number | null;
+  upside_pct: number | null;
+  url: string | null;
+  fetched_at: string;
+  /** The stock has its own page in this app. */
+  tracked: boolean;
+}

@@ -9,7 +9,7 @@ from typing import Any
 
 from app import config, timeutil
 
-SCHEMA_VERSION = 13
+SCHEMA_VERSION = 14
 MIGRATIONS_DIR = Path(__file__).with_name("migrations")
 SCHEMA_PATH = Path(__file__).with_name("schema.sql")
 SCREEN_PRESETS_PATH = Path(__file__).with_name("presets") / "screens.json"

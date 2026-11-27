@@ -1,0 +1,26 @@
+{
+  "transport": {
+    "https://trendlyne.com/research-reports/all/": {
+      "status": 200,
+      "file": "list.html"
+    }
+  },
+  "cases": [
+    {
+      "capability": "research",
+      "args": {},
+      "expect": {
+        "min_rows": 3,
+        "symbols": [
+          "AAA",
+          "BBB",
+          "CCC"
+        ]
+      }
+    }
+  ],
+  "refusal": {
+    "capability": "research",
+    "args": {}
+  }
+}
