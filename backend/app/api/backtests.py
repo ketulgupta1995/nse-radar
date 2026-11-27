@@ -135,6 +135,8 @@ def final_test(backtest_id: int) -> dict:
         if row["kind"] != "explore" or row["status"] != "done":
             raise HTTPException(400, "Only a finished training-period backtest can get a final test.")
         cfg = json.loads(row["config"])
+        if (cfg.get("oos_start") or "") > str(timeutil.today()):
+            raise HTTPException(400, "This is a weekly recent-window check; it has no test period to run.")
         fp = metrics.fingerprint(cfg)
         mine = _window(cfg, "final")
         earlier = c.execute("SELECT id, config, fingerprint FROM backtests WHERE kind='final'").fetchall()

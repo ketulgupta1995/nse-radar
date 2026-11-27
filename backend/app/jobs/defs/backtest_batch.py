@@ -40,7 +40,11 @@ def run(ctx: JobContext) -> str | None:
 
 
 def _run(ctx: JobContext) -> str | None:
-    wanted = [int(i) for i in ctx.params["backtest_ids"]]
+    return run_ids(ctx, [int(i) for i in ctx.params["backtest_ids"]])
+
+
+def run_ids(ctx: JobContext, wanted: list[int]) -> str:
+    """Run these explore rows with one shared data load; also used by the weekly job."""
     with db.tx() as c:
         found = {r["id"]: r for r in c.execute("SELECT * FROM backtests").fetchall() if r["id"] in wanted}
     ids = [i for i in wanted if i in found]
