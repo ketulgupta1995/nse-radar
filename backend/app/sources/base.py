@@ -142,6 +142,9 @@ def from_fetch_error(e: FetchError) -> Exception:
     return SourceError(str(e))
 
 
+WHOLE_UNIVERSE = 600  # max_items for a job that must reach every stock each run (Nifty 500, with room)
+
+
 @dataclass(frozen=True)
 class JobVariant:
     suffix: str = ""  # job name = f"{capability}.{source}" + (f".{suffix}" if suffix else "")

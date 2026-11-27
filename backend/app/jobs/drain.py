@@ -9,6 +9,7 @@ Output is counts only (§17.8): never params, messages or rows.
 import argparse
 import json
 import logging
+import os
 import threading
 import time
 
@@ -17,7 +18,7 @@ from app.jobs import runner, scheduler
 
 log = logging.getLogger("app.jobs.drain")  # explicit: under `python -m` __name__ is "__main__"
 
-DEFAULT_BUDGET_MIN = 100.0
+DEFAULT_BUDGET_MIN = 300.0  # drain.yml times out at 340; GitHub allows 360 per job
 STOP_REPEAT_S = 1.0  # after the budget, keep asking whatever is running to stop
 
 
@@ -123,6 +124,20 @@ def _drain(lanes: tuple[str, ...], expired: threading.Event, counts: dict[str, i
             return
 
 
+def _queued(lanes: tuple[str, ...]) -> int:
+    with db.tx() as c:
+        rows = c.execute("SELECT job FROM job_runs WHERE status='queued'").fetchall()
+    return sum(1 for r in rows if runner._job_info(r["job"])[0] in lanes)
+
+
+def _report_more(more: bool) -> None:
+    """Tell drain.yml whether jobs are still waiting after the budget, so it can start another drain."""
+    path = os.environ.get("GITHUB_OUTPUT")
+    if path:
+        with open(path, "a") as f:
+            f.write(f"more={'true' if more else 'false'}\n")
+
+
 def _summary(counts: dict[str, int], minutes: float, budget_hit: bool) -> str:
     return (
         f"drain finished: jobs={counts['jobs']} done={counts.get('done', 0)} "
@@ -142,13 +157,15 @@ def main(argv: list[str] | None = None) -> int:
     timer = threading.Timer(budget_min * 60, _watchdog, args=(expired, finished))
     timer.daemon = True
     timer.start()
+    lanes = _lanes(args.lane)
     counts = {"jobs": 0, "items_ok": 0, "items_failed": 0, "resumed": 0}
     try:
-        _drain(_lanes(args.lane), expired, counts)
+        _drain(lanes, expired, counts)
     finally:
         finished.set()
         timer.cancel()
     db.sync()
+    _report_more(expired.is_set() and _queued(lanes) > 0)
     log.info(_summary(counts, (time.monotonic() - t0) / 60, expired.is_set()))
     return 0
 

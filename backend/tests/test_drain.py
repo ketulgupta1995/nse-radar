@@ -143,3 +143,39 @@ def test_seeded_db_gets_bar_counts_once(monkeypatch):
     assert "rows" in db.get_setting(bardb.COVERAGE_KEY)
     assert drain.main([]) == 0
     assert len(runs("housekeeping")) == 1  # the snapshot exists now: not queued again
+
+
+def test_reports_leftover_jobs_to_the_workflow(monkeypatch, tmp_path):
+    out = tmp_path / "gh_output"
+    monkeypatch.setenv("GITHUB_OUTPUT", str(out))
+    reg("dr_bg", lambda ctx: None)
+    runner.enqueue("dr_bg")
+    assert drain.main([]) == 0
+    assert out.read_text() == "more=false\n"
+
+
+def test_budget_hit_with_jobs_left_asks_for_another_drain(monkeypatch, tmp_path):
+    out = tmp_path / "gh_output"
+    monkeypatch.setenv("GITHUB_OUTPUT", str(out))
+    monkeypatch.setattr(drain, "DEFAULT_BUDGET_MIN", 0.2 / 60)
+    monkeypatch.setattr(drain, "STOP_REPEAT_S", 0.05)
+
+    def slow(ctx):
+        deadline = time.monotonic() + 10
+        while time.monotonic() < deadline:
+            ctx.check_stop()
+            time.sleep(0.02)
+
+    reg("dr_loop", slow)
+    runner.enqueue("dr_loop")
+    assert drain.main([]) == 0
+    assert out.read_text() == "more=true\n"  # the stopped run was queued again
+
+
+def test_default_budget_fits_the_workflow_timeout():
+    import re
+    from pathlib import Path
+
+    wf = (Path(__file__).parents[2] / ".github/workflows/drain.yml").read_text()
+    timeout = int(re.search(r"timeout-minutes: (\d+)", wf).group(1))
+    assert drain.DEFAULT_BUDGET_MIN + 20 <= timeout <= 360

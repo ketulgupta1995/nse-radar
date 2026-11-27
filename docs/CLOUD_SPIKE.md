@@ -69,3 +69,11 @@ Behaviour found on the way (libsql 0.1.11, replica):
 Fix (`app/dbdriver.py`, `db.tx()`): no PRAGMA per connection, and on the replica `db.tx()` is a lazy transaction. Reads run on the local file, writes are held, and COMMIT sends them as one checked `BEGIN IMMEDIATE; …; COMMIT` batch. If `in_transaction` is still set afterwards, the batch is replayed statement by statement to raise the real error. A transaction that needs `rowcount` / `lastrowid` or reads after writing goes remote and runs as before. Because reads are local, the drain calls `sync()` before picking each job, and a running job syncs every 15 s to see stop requests from the site. `price_checks` now does all its reads before its writes.
 
 Same laptop measurements after the fix: a read-only transaction takes 7 ms instead of ~4 s, and 1 read + 8 writes takes 2.3 s instead of ~12 s.
+
+### Two more read-after-write paths (2026-11-27)
+
+The same effect remained in two places, measured with the fake replica in `tests/test_replica_roundtrips.py`:
+- `refresh_event_factors` deleted every universe symbol's rows first, then read corporate actions and price histories, so the whole job ran remotely: 442 round trips for 40 symbols. It now computes everything first and writes at the end: 1 round trip.
+- `save_bars` called `bardb.ensure_source` and `bardb.symbol_ids`, which always wrote (`INSERT OR IGNORE`) and then read the ids back, so every by-symbol price fetch went remote: 10.3 round trips per symbol. They now read first and insert only new names: 2.3 per symbol (the save batch and `ctx.item`).
+
+Also on 2026-11-27: by-symbol universe jobs that are meant to refresh every stock each run (`bars.yfinance`, the weekly `actions.*` and `fundamentals.yfinance`) were capped at the default `max_items` = 200, so 300 of the Nifty 500 waited up to 2.5 runs or weeks. They now use `WHOLE_UNIVERSE` = 600. `quarters.nse_api` went from 30 to 60 per drain, because the cloud runs it 12 times a week, not hourly.

@@ -17,6 +17,7 @@ import yfinance as yf
 from app import config
 from app.sources import registry
 from app.sources.base import (
+    WHOLE_UNIVERSE,
     Action,
     Bar,
     BaseSource,
@@ -114,6 +115,7 @@ class YFinance(BaseSource):
             (
                 JobVariant(
                     schedule={"kind": "daily", "at_time": "20:30", "weekdays_only": 1},
+                    max_items=WHOLE_UNIVERSE,
                     refresh=True,
                 ),
             ),
@@ -122,12 +124,24 @@ class YFinance(BaseSource):
         CapabilitySpec(
             "actions",
             "by_symbol",
-            (JobVariant(schedule={"kind": "weekly", "weekday": 5, "at_time": "10:00"}, min_age_hours=144),),
+            (
+                JobVariant(
+                    schedule={"kind": "weekly", "weekday": 5, "at_time": "10:00"},
+                    max_items=WHOLE_UNIVERSE,
+                    min_age_hours=144,
+                ),
+            ),
         ),
         CapabilitySpec(
             "fundamentals",
             "by_symbol",
-            (JobVariant(schedule={"kind": "weekly", "weekday": 6, "at_time": "10:00"}, min_age_hours=144),),
+            (
+                JobVariant(
+                    schedule={"kind": "weekly", "weekday": 6, "at_time": "10:00"},
+                    max_items=WHOLE_UNIVERSE,
+                    min_age_hours=144,
+                ),
+            ),
         ),
         CapabilitySpec(
             "index",

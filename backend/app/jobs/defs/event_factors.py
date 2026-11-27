@@ -11,6 +11,7 @@ from app.jobs.registry import JobDef, register
 def run(ctx: JobContext) -> str | None:
     with db.tx() as c:
         events.refresh_event_factors(c)
+    with db.tx() as c:  # its own transaction: a read after the writes above would send them one by one
         rows = c.execute("SELECT method, COUNT(*) AS n FROM event_factors GROUP BY method").fetchall()
     counts = {r["method"]: r["n"] for r in rows}
     ref, opn, cls, none = (counts.get(m, 0) for m in ("reference", "open", "close", "none"))

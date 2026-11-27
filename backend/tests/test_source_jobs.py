@@ -391,3 +391,16 @@ def test_old_bonus_keeps_incremental_start():
 def test_unadjusted_source_ignores_recent_bonus():
     _seed_bars_and_action("fakesym", (NOW.date() - timedelta(days=10)).isoformat())
     assert _start_used("fakesym") == d("2026-11-01")
+
+
+def test_universe_jobs_reach_every_stock_each_run():
+    """Nifty 500: a by-symbol universe job capped below 500 leaves stocks stale for weeks."""
+    from app.sources.adapters import nse_api, yfinance
+    from app.sources.base import WHOLE_UNIVERSE
+
+    assert WHOLE_UNIVERSE >= 500
+    wanted = ((yfinance.YFinance, ("bars", "actions", "fundamentals")), (nse_api.NseApi, ("actions",)))
+    for src, caps in wanted:
+        for cs in src.capabilities:
+            if cs.capability in caps:
+                assert all(v.max_items >= 500 for v in cs.jobs), (src.name, cs.capability)

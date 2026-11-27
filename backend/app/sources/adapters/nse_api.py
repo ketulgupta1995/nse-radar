@@ -5,6 +5,7 @@ from datetime import date, datetime
 from app import config, timeutil
 from app.sources import http, registry
 from app.sources.base import (
+    WHOLE_UNIVERSE,
     Action,
     Announcement,
     BaseSource,
@@ -74,6 +75,7 @@ class NseApi(BaseSource):
             (
                 JobVariant(
                     schedule={"kind": "weekly", "weekday": 5, "at_time": "09:00"},
+                    max_items=WHOLE_UNIVERSE,
                     min_age_hours=144,
                 ),
             ),
@@ -84,7 +86,7 @@ class NseApi(BaseSource):
             (
                 JobVariant(
                     schedule={"kind": "interval", "interval_min": 60},
-                    max_items=30,
+                    max_items=60,  # 2 drains a weekday, 1 on weekends: 720 a week covers 500 stocks
                     min_age_hours=168,
                 ),
             ),

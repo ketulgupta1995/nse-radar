@@ -82,17 +82,31 @@ def whole(x: float | None) -> int | None:
 
 
 def ensure_source(name: str, conn: sqlite3.Connection) -> None:
-    """Give `name` a source id if it has none yet (call before inserting its bars)."""
-    conn.execute("INSERT OR IGNORE INTO bar_sources(name) VALUES (?)", (name,))
+    """Give `name` a source id if it has none yet (call before inserting its bars).
+
+    Reads first and writes only for a new source: on the Actions replica a read after a held write
+    sends the whole transaction to Turso statement by statement (docs/CLOUD_SPIKE.md, "First drain")."""
+    if conn.execute("SELECT 1 FROM bar_sources WHERE name=?", (name,)).fetchone() is None:
+        conn.execute("INSERT OR IGNORE INTO bar_sources(name) VALUES (?)", (name,))
 
 
-def symbol_ids(symbols: Iterable[str], conn: sqlite3.Connection) -> dict[str, int]:
-    """{symbol: sym_id}, giving new symbols an id (call before inserting their bars)."""
-    syms = sorted(set(symbols))
-    conn.executemany("INSERT OR IGNORE INTO bar_symbols(symbol) VALUES (?)", [(s,) for s in syms])
+def _known_ids(syms: list[str], conn: sqlite3.Connection) -> dict[str, int]:
     out: dict[str, int] = {}
     for i in range(0, len(syms), 500):
         part = syms[i : i + 500]
         q = f"SELECT symbol, id FROM bar_symbols WHERE symbol IN ({','.join('?' * len(part))})"
         out.update({r[0]: r[1] for r in conn.execute(q, part)})
+    return out
+
+
+def symbol_ids(symbols: Iterable[str], conn: sqlite3.Connection) -> dict[str, int]:
+    """{symbol: sym_id}, giving new symbols an id (call before inserting their bars).
+
+    Known symbols are read without writing anything (see `ensure_source`); only new ones are inserted."""
+    syms = sorted(set(symbols))
+    out = _known_ids(syms, conn)
+    new = [s for s in syms if s not in out]
+    if new:
+        conn.executemany("INSERT OR IGNORE INTO bar_symbols(symbol) VALUES (?)", [(s,) for s in new])
+        out.update(_known_ids(new, conn))
     return out

@@ -170,19 +170,22 @@ def _events(conn: sqlite3.Connection, symbols: list[str]) -> list[tuple[str, str
 
 
 def refresh_event_factors(conn: sqlite3.Connection, symbols: list[str] | None = None) -> int:
-    """Delete and recompute event_factors for `symbols` (default: the universe); returns rows written."""
+    """Delete and recompute event_factors for `symbols` (default: the universe); returns rows written.
+
+    Every read comes before the first write: on the Actions replica a read after a held write sends
+    the rest of the transaction to Turso statement by statement, price histories included
+    (docs/CLOUD_SPIKE.md, "First drain")."""
     syms = symbols if symbols is not None else frames.universe(conn)
-    for sym in syms:
-        conn.execute("DELETE FROM event_factors WHERE symbol=?", (sym,))
     now = timeutil.now_iso()
-    n = 0
+    rows = []
     for sym, ex, kind in _events(conn, syms):
         factor, method, detail = compute_event_factor(sym, ex, kind, conn)
-        conn.execute(
-            "INSERT INTO event_factors(symbol, ex_date, kind, factor, method, detail, computed_at) "
-            "VALUES (?,?,?,?,?,?,?)",
-            (sym, ex, kind, factor, method, json.dumps(detail), now),
-        )
-        n += 1
+        rows.append((sym, ex, kind, factor, method, json.dumps(detail), now))
+    conn.executemany("DELETE FROM event_factors WHERE symbol=?", [(s,) for s in syms])
+    conn.executemany(
+        "INSERT INTO event_factors(symbol, ex_date, kind, factor, method, detail, computed_at) "
+        "VALUES (?,?,?,?,?,?,?)",
+        rows,
+    )
     frames.invalidate()
-    return n
+    return len(rows)
