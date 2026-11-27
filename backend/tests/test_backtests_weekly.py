@@ -55,11 +55,11 @@ def test_replaces_last_week_and_keeps_other_backtests():
     assert json.loads(rows[1]["config"])["max_positions"] == 5  # setup borrowed from "Mine"
 
 
-def test_scheduled_sunday_noon(monkeypatch):
+def test_scheduled_saturday_morning(monkeypatch):
     friday = datetime(2026, 11, 27, 18, 0, tzinfo=timeutil.now().tzinfo)
     monkeypatch.setattr(timeutil, "now", lambda: friday)
     scheduler.ensure_schedules()
     with db.tx() as c:
         row = c.execute("SELECT * FROM job_schedules WHERE job='backtests_weekly'").fetchone()
-    assert (row["kind"], row["weekday"], row["at_time"]) == ("weekly", 6, "12:00")
-    assert row["next_run_at"].startswith("2026-11-29T12:00")
+    assert (row["kind"], row["weekday"], row["at_time"]) == ("weekly", 5, "08:00")
+    assert row["next_run_at"].startswith("2026-11-28T08:00")

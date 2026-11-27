@@ -82,7 +82,7 @@ register(
         description="Backtests every saved screen over the last 12 months and the last 4 years. "
         "Replaces last week's results.",
         fn=run,
-        default_schedule={"kind": "weekly", "at_time": "12:00", "weekday": 6},  # Sunday
+        default_schedule={"kind": "weekly", "at_time": "08:00", "weekday": 5},  # Saturday
         stage=7,
     )
 )
