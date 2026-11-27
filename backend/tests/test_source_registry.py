@@ -82,7 +82,7 @@ def test_spec_lookup():
 
 @pytest.mark.parametrize(
     "status,exc",
-    [(403, SourceRefused), (401, SourceRefused), (429, SourceRefused), (404, NotFound),
+    [(403, SourceRefused), (401, SourceRefused), (405, SourceRefused), (429, SourceRefused), (404, NotFound),
      (500, SourceError), (None, SourceError)],
 )
 def test_from_fetch_error(status, exc):

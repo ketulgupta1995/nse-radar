@@ -53,9 +53,9 @@ def _policy(host: str) -> HttpPolicy:
     return POLICIES.get(host, POLICIES["*"])
 
 
-def _default_transport(timeout: float) -> Transport:
+def _default_transport(timeout: float, proxy: str | None = None) -> Transport:
     def send(url: str, params: dict | None, headers: dict) -> tuple[int, bytes]:
-        with httpx.Client(follow_redirects=True, timeout=timeout) as client:
+        with httpx.Client(follow_redirects=True, timeout=timeout, proxy=proxy) as client:
             r = client.get(url, params=params, headers=headers)
             return r.status_code, r.content
 
@@ -72,18 +72,19 @@ def _wait_turn(host: str, policy: HttpPolicy) -> None:
 
 
 def _attempt(
-    url: str, params: dict | None, headers: dict, host: str, policy: HttpPolicy
+    url: str, params: dict | None, headers: dict, host: str, policy: HttpPolicy, proxy: str | None
 ) -> tuple[int, bytes]:
-    send = _transport or _default_transport(policy.timeout_s)
+    send = _transport or _default_transport(policy.timeout_s, proxy)
+    key = f"{host}|{proxy}" if proxy else host  # a proxy is another source IP: it has its own turn
     with _guard:
-        lock = _host_locks.setdefault(host, threading.Lock())
+        lock = _host_locks.setdefault(key, threading.Lock())
     with lock:
-        _wait_turn(host, policy)
+        _wait_turn(key, policy)
         started = time.monotonic()
         try:
             return send(url, params, headers)
         finally:
-            _last_request[host] = time.monotonic()
+            _last_request[key] = time.monotonic()
             log.debug("GET %s %s (%.0f ms)", host, urlparse(url).path, (time.monotonic() - started) * 1000)
 
 
@@ -93,9 +94,11 @@ def get(
     params: dict | None = None,
     headers: dict | None = None,
     accept: str = "*/*",
+    proxy: str | None = None,  # "http://ip:port": send this request through that proxy
+    policy: HttpPolicy | None = None,  # override the host's policy (e.g. no retries through a proxy)
 ) -> bytes:
     host = urlparse(url).hostname or ""
-    policy = _policy(host)
+    policy = policy or _policy(host)
     hdrs = {"User-Agent": config.USER_AGENT, "Accept": accept, **(headers or {})}
     path = urlparse(url).path
     last_err: FetchError | None = None
@@ -103,7 +106,7 @@ def get(
         if attempt:
             time.sleep(2 ** attempt)  # 2s, 4s, 8s...
         try:
-            status, body = _attempt(url, params, hdrs, host, policy)
+            status, body = _attempt(url, params, hdrs, host, policy, proxy)
         except (httpx.TimeoutException, TimeoutError) as e:
             last_err = FetchError(f"timeout fetching {url}", url=url)
             log.debug("GET %s %s -> timeout (%s)", host, path, e)

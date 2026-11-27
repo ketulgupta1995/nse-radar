@@ -142,7 +142,7 @@ class ResearchReport:
 
 
 class SourceRefused(Exception):
-    """Site refused us (401/403/429): the job stops and the source is paused."""
+    """Site refused us (401/403/405/429): the job stops and the source is paused."""
 
 
 class NotFound(Exception):
@@ -154,7 +154,8 @@ class SourceError(Exception):
 
 
 def from_fetch_error(e: FetchError) -> Exception:
-    if e.status in (401, 403, 429):
+    # 405 is how Trendlyne refuses GitHub Actions' IPs (laptop gets 200): treat it as a refusal.
+    if e.status in (401, 403, 405, 429):
         return SourceRefused(str(e))
     if e.status == 404:
         return NotFound(str(e))

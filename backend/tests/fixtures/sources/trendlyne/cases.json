@@ -3,6 +3,16 @@
     "https://trendlyne.com/research-reports/all/": {
       "status": 200,
       "file": "list.html"
+    },
+    "https://raw.githubusercontent.com/Dahono-com/free-proxy-list/main/proxies/http.txt": {
+      "status": 200,
+      "file": "proxies.txt"
+    },
+    "https://raw.githubusercontent.com/Dahono-com/free-proxy-list/main/proxies/https.txt": {
+      "status": 404
+    },
+    "https://www.google.com/generate_204": {
+      "status": 204
     }
   },
   "cases": [
