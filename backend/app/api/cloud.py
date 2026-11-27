@@ -1,7 +1,11 @@
-from fastapi import APIRouter
+import hmac
+import os
 
-from app import config, db
+from fastapi import APIRouter, HTTPException, Request
+
+from app import config, db, timeutil
 from app.cloud import dispatch
+from app.jobs import scheduler
 
 router = APIRouter()
 
@@ -24,3 +28,21 @@ def cloud_status() -> dict:
         "running": int(row["running"] or 0),
         "oldest_queued_at": row["oldest"],
     }
+
+
+@router.get("/cloud/tick")
+def cloud_tick(request: Request) -> dict:
+    """Vercel cron (vercel.json `crons`): queue every due schedule, then dispatch one drain.
+
+    GitHub starts daily.yml's scheduled runs hours late, so the clock lives here instead. The jobs
+    go into the DB, so any drain picks them up, even if GitHub drops a pending run. Exempt from the
+    password gate; Vercel sends `Authorization: Bearer $CRON_SECRET` instead.
+    """
+    secret = os.environ.get("CRON_SECRET", "")
+    if not secret:
+        raise HTTPException(503, "CRON_SECRET is not set")
+    given = request.headers.get("authorization", "")
+    if not hmac.compare_digest(given.encode(), f"Bearer {secret}".encode()):
+        raise HTTPException(401, "bad cron secret")
+    ids = scheduler.tick(timeutil.now())
+    return {"enqueued": len(ids)}

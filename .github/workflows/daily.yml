@@ -1,4 +1,5 @@
-# The schedule (SPEC §17.4): runs the drain with --tick twice a day.
+# Fallback schedule (SPEC §17.4): runs the drain with --tick twice a day. GitHub starts these runs
+# hours late, so the real clock is the Vercel cron calling /api/cloud/tick. Also keeps itself enabled.
 name: daily
 on:
   schedule:
@@ -23,6 +24,9 @@ jobs:
   drain:
     needs: keepalive
     if: ${{ !cancelled() }}
+    permissions:
+      contents: read
+      actions: write  # drain.yml may start a follow-up drain
     uses: ./.github/workflows/drain.yml
     with:
       reason: schedule

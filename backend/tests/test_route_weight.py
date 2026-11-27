@@ -34,6 +34,7 @@ LIGHT = [
     "/api/health",
     "/api/me",
     "/api/cloud/status",
+    "/api/cloud/tick",
     "/api/jobs",
     "/api/jobs/status",
     "/api/jobs/runs",
@@ -214,11 +215,12 @@ def heavy_world(client, monkeypatch):
 def _measure(client, path: str) -> tuple[int, int]:
     frames.invalidate()  # a cold Vercel instance: nothing cached
     Counting.count = 0
-    r = client.get(path)
+    r = client.get(path, headers={"Authorization": "Bearer cron-test"})  # /api/cloud/tick checks it
     return r.status_code, Counting.count
 
 
-def test_every_light_route_is_under_budget(heavy_world, client):
+def test_every_light_route_is_under_budget(heavy_world, client, monkeypatch):
+    monkeypatch.setenv("CRON_SECRET", "cron-test")
     over = []
     for raw in LIGHT:
         path = raw.format(**heavy_world)

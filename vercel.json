@@ -23,6 +23,17 @@
       }
     }
   },
+  "crons": [
+    { "path": "/api/cloud/tick", "schedule": "0 3 * * *" },
+    { "path": "/api/cloud/tick", "schedule": "0 5 * * *" },
+    { "path": "/api/cloud/tick", "schedule": "0 7 * * *" },
+    { "path": "/api/cloud/tick", "schedule": "0 10 * * *" },
+    { "path": "/api/cloud/tick", "schedule": "0 14 * * *" },
+    { "path": "/api/cloud/tick", "schedule": "0 15 * * *" },
+    { "path": "/api/cloud/tick", "schedule": "0 16 * * *" },
+    { "path": "/api/cloud/tick", "schedule": "0 17 * * *" },
+    { "path": "/api/cloud/tick", "schedule": "0 21 * * *" }
+  ],
   "rewrites": [
     { "source": "/api/(.*)", "destination": { "service": "api" } },
     { "source": "/(.*)", "destination": { "service": "web" } }

@@ -30,6 +30,7 @@ never appear in `GET /api/settings`.
 | `/api/health` | schema version | 3 | light | as local |
 | `/api/me` | the session cookie only | 0 | light | as local |
 | `/api/cloud/status` | queued/running counts, dispatch settings | 6 | light | as local |
+| `/api/cloud/tick` | due `job_schedules`, one enqueue per due job | 1 + ~4 per due job | light | Vercel cron only (§17.4); `Authorization: Bearer $CRON_SECRET`, exempt from the password gate |
 | `/api/jobs` | registry; schedules, newest run per job, running runs, source on/off | 19 | light (was 123: three queries per job) | batched: one query each for schedules, last runs and running runs; on/off read once per source |
 | `/api/jobs/status` | runner status; newest bar day (key seek per source × symbol) | 6 | light | the newest-day answer is reused for up to 5 min (`frames.memo`): the header polls this every 5–60 s |
 | `/api/jobs/runs`, `/runs/{id}`, `/runs/{id}/items`, `/runs/{id}/logs` | `job_runs`, `job_items`, `job_logs` | 4–5 | light | as local. Pages poll `/runs/{id}` while a job runs |

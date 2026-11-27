@@ -47,7 +47,7 @@ register(
         title="Merge fundamentals",
         description="Combines every source's ratios into one record per company, noting each field's source.",
         fn=run,
-        default_schedule={"kind": "daily", "at_time": "23:30"},
+        default_schedule={"kind": "manual"},  # fundamentals/quarters jobs queue it when they finish
         stage=6,
         followups=("screens_run",),
     )

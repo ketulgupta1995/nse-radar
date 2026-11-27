@@ -141,3 +141,36 @@ def test_status_empty_not_configured(client, calls, monkeypatch):
     assert body["dispatch_configured"] is False
     assert (body["queued"], body["running"], body["oldest_queued_at"]) == (0, 0, None)
     assert calls == []
+
+
+def _due_noop() -> None:
+    with db.tx() as c:
+        c.execute(
+            "INSERT OR REPLACE INTO job_schedules(job, kind, interval_min, enabled, next_run_at) "
+            "VALUES ('noop', 'interval', 60, 1, ?)",
+            ((T0 - timedelta(minutes=1)).isoformat(timespec="seconds"),),
+        )
+
+
+def test_tick_needs_cron_secret(client, calls, monkeypatch):
+    _due_noop()
+    monkeypatch.delenv("CRON_SECRET", raising=False)
+    assert client.get("/api/cloud/tick").status_code == 503
+    monkeypatch.setenv("CRON_SECRET", "cron-s3cret")
+    assert client.get("/api/cloud/tick").status_code == 401
+    assert client.get("/api/cloud/tick", headers={"Authorization": "Bearer nope"}).status_code == 401
+    with db.read() as c:
+        assert c.execute("SELECT COUNT(*) AS n FROM job_runs").fetchone()["n"] == 0
+    assert calls == []
+
+
+def test_tick_enqueues_due_and_dispatches_once(client, calls, monkeypatch):
+    _due_noop()
+    monkeypatch.setenv("CRON_SECRET", "cron-s3cret")
+    monkeypatch.setenv("APP_PASSWORD", "open-sesame")  # the password gate does not block the cron
+    monkeypatch.setattr(config, "RUNTIME", "vercel")
+    auth = {"Authorization": "Bearer cron-s3cret"}
+    assert client.get("/api/cloud/tick", headers=auth).json() == {"enqueued": 1}
+    assert [c[0] for c in calls] == ["POST"]
+    assert client.get("/api/cloud/tick", headers=auth).json() == {"enqueued": 0}  # no longer due
+    assert len(calls) == 1

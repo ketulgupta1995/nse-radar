@@ -19,7 +19,7 @@ log = logging.getLogger(__name__)
 
 COOKIE = "nr_session"
 MAX_AGE_S = 90 * 24 * 3600
-EXEMPT = frozenset({"/api/health", "/api/login", "/api/me"})
+EXEMPT = frozenset({"/api/health", "/api/login", "/api/me", "/api/cloud/tick"})  # tick: CRON_SECRET
 
 
 def password() -> str:
